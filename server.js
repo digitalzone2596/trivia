@@ -391,11 +391,21 @@ io.on('connection', (socket) => {
   });
 });
 
+// Enrutamiento SPA para Render (sirve index.html en cualquier ruta cliente)
+app.get('*', (req, res) => {
+  const distPath = path.join(__dirname, 'dist', 'index.html');
+  res.sendFile(distPath, (err) => {
+    if (err) {
+      res.sendFile(path.join(__dirname, 'index.html'));
+    }
+  });
+});
+
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n========================================`);
   console.log(` Servidor TikTok Live Trivia Arena Activo`);
-  console.log(` URL OBS: http://localhost:${PORT}`);
+  console.log(` Escuchando en: http://0.0.0.0:${PORT}`);
   console.log(` Conector TikTok Live: Listo (v2.5)`);
   console.log(`========================================\n`);
 });
