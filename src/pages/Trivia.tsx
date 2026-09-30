@@ -26,8 +26,15 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { io as socketIOClient } from 'socket.io-client';
+import { useAuth } from '../context/AuthContext'; // <-- 1. IMPORTAR AUTENTICACIÓN
 
 export default function Trivia() {
+  // Obtener la información del usuario autenticado
+  const { user, userProfile, isAdmin } = useAuth();
+  
+  // Usuario de TikTok registrado y autorizado en la cuenta
+  const registeredTikTok = userProfile?.tiktokUsername?.trim().replace(/^@/, '') || '';
+
   // Check if URL has ?obs=true or ?obs=1
   const searchParams = new URLSearchParams(window.location.search);
   const isDirectObsUrl = searchParams.get('obs') === 'true' || searchParams.get('obs') === '1';
@@ -38,14 +45,27 @@ export default function Trivia() {
   const [targetPoints, setTargetPoints] = useState<number>(50);
   const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
 
-  // TikTok connection status
+  // TikTok connection status (Pre-cargamos su usuario si lo tiene registrado)
   const [tikTokStatus, setTikTokStatus] = useState<TikTokStatus>({
     estado: 'desconectado',
-    username: '',
-    mensaje: 'Ingresa tu usuario de TikTok y pulsa Conectar',
+    username: registeredTikTok ? `@${registeredTikTok}` : '',
+    mensaje: registeredTikTok 
+      ? `Cuenta autorizada: @${registeredTikTok}. Pulsa Conectar.`
+      : 'Ingresa tu usuario de TikTok y pulsa Conectar',
     viewerCount: 0,
     roomId: null,
   });
+
+  // Si los datos del perfil tardan un segundo en cargar de Firebase, actualizar el estado
+  useEffect(() => {
+    if (registeredTikTok && tikTokStatus.estado === 'desconectado' && !tikTokStatus.username) {
+      setTikTokStatus((prev) => ({
+        ...prev,
+        username: `@${registeredTikTok}`,
+        mensaje: `Cuenta autorizada: @${registeredTikTok}. Pulsa Conectar.`,
+      }));
+    }
+  }, [registeredTikTok, tikTokStatus.estado, tikTokStatus.username]);
 
   // Data states: 100+ preguntas barajadas aleatoriamente desde el inicio
   const [questions, setQuestions] = useState<TriviaQuestion[]>(() => {
@@ -60,13 +80,11 @@ export default function Trivia() {
 
   const [topPlayers, setTopPlayers] = useState<PlayerScore[]>(() => {
     try {
-      // Clear old simulated players from previous versions
       localStorage.removeItem('tt_trivia_players');
       const saved = localStorage.getItem('tt_trivia_players_real');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          // Filter out any leftover fake names
           return parsed.filter(
             (p) =>
               p.username &&
@@ -166,30 +184,23 @@ export default function Trivia() {
     setGlobalRankings((prev) => [newEntry, ...prev]);
   };
 
-  // Reset tournament: limpia la tabla por completo y baraja aleatoriamente las preguntas
+  // Reset tournament
   const handleResetTournament = () => {
     try {
       localStorage.removeItem('tt_trivia_players_real');
     } catch {}
     currentQuestionVotersRef.current.clear();
-    // Toda la tabla de jugadores se vacía por completo para iniciar desde cero
     setTopPlayers([]);
-    // Cada torneo comienza con un orden aleatorio totalmente nuevo
     setQuestions(getShuffledQuestions(INITIAL_QUESTIONS));
     currentQuestionIdxRef.current = 0;
   };
 
   const currentQuestionIdxRef = useRef<number>(0);
-  // Registro de usuarios que ya votaron en la pregunta actual (1 solo voto por espectador)
   const currentQuestionVotersRef = useRef<Set<string>>(new Set());
 
-  // Asegura que cada nueva pregunta arranque con 0 votos y baraje si completa la ronda
   const handleQuestionAdvance = (nextIdx: number) => {
     currentQuestionIdxRef.current = nextIdx;
-    // Limpiar el registro de votantes para la nueva pregunta
     currentQuestionVotersRef.current.clear();
-
-    // Limpiar respuesta previa de la ronda anterior
     setTopPlayers((prev) => prev.map((p) => ({ ...p, lastAnswer: undefined })));
 
     setQuestions((prev) => {
@@ -207,22 +218,18 @@ export default function Trivia() {
     });
   };
 
-  // Handle real TikTok viewer vote arrival (Estricto: 1 voto por usuario por pregunta)
+  // Handle real TikTok viewer vote arrival
   const handleRealTikTokVote = useCallback((usuario: string, foto: string, respuesta: 'A' | 'B' | 'C' | 'D') => {
     const cleanUser = (usuario || '').toLowerCase().trim().replace(/^@/, '');
     if (!cleanUser) return;
 
-    // Si el usuario ya votó en la pregunta actual, ignorar cualquier voto posterior
     if (currentQuestionVotersRef.current.has(cleanUser)) {
-      console.log(`[VOTO IGNORADO] @${cleanUser} ya votó en esta pregunta.`);
       return;
     }
-    // Registrar el voto de este usuario para la pregunta activa
     currentQuestionVotersRef.current.add(cleanUser);
 
     const formattedUsername = usuario.startsWith('@') ? usuario : `@${usuario}`;
 
-    // 1. Add/Update player in real rankings (fijar su única respuesta)
     setTopPlayers((prev) => {
       const existingIdx = prev.findIndex((p) => p.username.toLowerCase().replace(/^@/, '') === cleanUser);
       if (existingIdx !== -1) {
@@ -247,7 +254,6 @@ export default function Trivia() {
       }
     });
 
-    // 2. Increment vote on the CURRENT ACTIVE question option
     const activeIdx = currentQuestionIdxRef.current;
     setQuestions((prev) => {
       if (prev.length === 0 || !prev[activeIdx]) return prev;
@@ -264,11 +270,30 @@ export default function Trivia() {
     });
   }, []);
 
-  // Connect / Disconnect Handlers
-  const handleConnectTikTok = async (username: string) => {
+  // -------------------------------------------------------------
+  // CANDADO DE SEGURIDAD AL CONECTAR CON TIKTOK
+  // -------------------------------------------------------------
+  const handleConnectTikTok = async (inputUsername: string) => {
+    const cleanInput = (inputUsername || '').trim().replace(/^@/, '').toLowerCase();
+    const cleanRegistered = registeredTikTok.toLowerCase();
+
+    // CANDADO 1: Si no es admin y tiene cuenta registrada, OBLIGATORIAMENTE se usa la suya
+    if (!isAdmin && cleanRegistered && cleanInput !== cleanRegistered) {
+      alert(`Tu licencia está vinculada exclusivamente a la cuenta @${registeredTikTok}. No puedes conectar cuentas de terceros.`);
+      return;
+    }
+
+    // Usuario definitivo a conectar
+    const targetUsername = (!isAdmin && cleanRegistered) ? registeredTikTok : cleanInput;
+
+    if (!targetUsername) {
+      alert('Por favor ingresa un usuario de TikTok válido.');
+      return;
+    }
+
     setTikTokStatus({
       estado: 'conectando',
-      username: username.startsWith('@') ? username : `@${username}`,
+      username: `@${targetUsername}`,
       mensaje: `Conectando con TikTok...`,
       viewerCount: 0,
       roomId: null,
@@ -278,17 +303,16 @@ export default function Trivia() {
       const res = await fetch('/api/tiktok/conectar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({ username: targetUsername }),
       });
       const data = await res.json();
       if (data && data.estado) {
         setTikTokStatus(data);
       }
     } catch {
-      // If running standalone or direct socket
       const win = window as unknown as { socket?: { emit: (e: string, d: unknown) => void } };
       if (win.socket) {
-        win.socket.emit('conectarTikTok', { username });
+        win.socket.emit('conectarTikTok', { username: targetUsername });
       }
     }
   };
@@ -301,7 +325,7 @@ export default function Trivia() {
     } catch {
       setTikTokStatus({
         estado: 'desconectado',
-        username: '',
+        username: registeredTikTok ? `@${registeredTikTok}` : '',
         mensaje: 'Desconectado del directo.',
         viewerCount: 0,
         roomId: null,
@@ -331,7 +355,6 @@ export default function Trivia() {
         }
       });
 
-      // Escuchar donaciones de regalos de TikTok Live
       socket.on('tiktokDonacion', (data: { usuario: string; foto?: string; regalo: string; accion: '50-50' | 'saltar'; monedas?: number }) => {
         const win = window as unknown as { donacionTikTok?: (d: unknown) => void };
         if (win.donacionTikTok) {
@@ -339,7 +362,6 @@ export default function Trivia() {
         }
       });
 
-      // Escuchar comodines directos
       socket.on('accionComodin', (data: { tipo: '50-50' | 'saltar'; usuario?: string; regalo?: string; foto?: string }) => {
         const win = window as unknown as { activar5050?: (u?: string, r?: string, f?: string) => void; saltarPregunta?: (u?: string, r?: string, f?: string) => void };
         if (data?.tipo === '50-50' && win.activar5050) {
@@ -350,7 +372,6 @@ export default function Trivia() {
       });
     } catch {}
 
-    // Check initial status from server API
     fetch('/api/tiktok/estado')
       .then((r) => r.json())
       .then((data) => {
@@ -389,9 +410,8 @@ export default function Trivia() {
 
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col font-sans select-none">
-      {/* Top Header: 3-Zone Clean Contract */}
+      {/* Top Header */}
       <header className="flex items-center justify-between px-6 py-3 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
-        {/* Zone 1: Wordmark */}
         <div className="flex items-center gap-3">
           <a href="/" className="font-extrabold text-base tracking-tight text-white flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400 animate-pulse" />
@@ -399,7 +419,6 @@ export default function Trivia() {
           </a>
         </div>
 
-        {/* Zone 2: Navigation Links */}
         <nav className="hidden md:flex items-center gap-5 text-xs font-semibold text-slate-400">
           <button
             onClick={() => setIsQuestionsModalOpen(true)}
@@ -417,7 +436,6 @@ export default function Trivia() {
           </button>
         </nav>
 
-        {/* Zone 3: Primary Desplegable Configuration Button */}
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => setIsConfigOpen(!isConfigOpen)}
@@ -429,11 +447,7 @@ export default function Trivia() {
           >
             <Settings className="w-3.5 h-3.5 text-cyan-400" />
             <span>Configuración</span>
-            {isConfigOpen ? (
-              <ChevronUp className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            )}
+            {isConfigOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
 
           <button
@@ -456,11 +470,11 @@ export default function Trivia() {
         onDisconnect={handleDisconnectTikTok}
       />
 
-      {/* CONFIGURACIÓN DESPLEGABLE (DROPDOWN DRAWER) */}
+      {/* CONFIGURACIÓN DESPLEGABLE */}
       {isConfigOpen && (
         <div className="bg-slate-900/95 border-b border-cyan-500/30 backdrop-blur-xl px-6 py-5 z-30 animate-fade-in shadow-2xl">
           <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-6 text-xs text-slate-300">
-            {/* 1. Meta de Puntos */}
+            {/* Meta de Puntos */}
             <div className="space-y-2">
               <label className="font-bold text-slate-200 flex items-center gap-1.5">
                 <Target className="w-4 h-4 text-amber-400" />
@@ -486,7 +500,7 @@ export default function Trivia() {
               </div>
             </div>
 
-            {/* 2. Tiempo de Pregunta */}
+            {/* Tiempo de Pregunta */}
             <div className="space-y-2">
               <label className="font-bold text-slate-200 flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-cyan-400" />
@@ -512,7 +526,7 @@ export default function Trivia() {
               </div>
             </div>
 
-            {/* 3. Estilo OBS y Transparencia */}
+            {/* Estilo OBS y Transparencia */}
             <div className="space-y-2">
               <label className="font-bold text-slate-200 flex items-center gap-1.5">
                 <Layers className="w-4 h-4 text-pink-400" />
@@ -538,7 +552,7 @@ export default function Trivia() {
               </div>
             </div>
 
-            {/* 4. Comodines por Donación de TikTok */}
+            {/* Comodines por Donación */}
             <div className="space-y-2 p-3 rounded-2xl bg-slate-950/70 border border-amber-500/20">
               <label className="font-bold text-amber-300 text-xs flex items-center gap-1.5 uppercase tracking-wide">
                 <span>🎁 Comodines por Donación</span>
@@ -546,11 +560,11 @@ export default function Trivia() {
               <div className="text-[11px] text-slate-300 space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="text-base">🌹</span>
-                  <span><strong>Rosa / 1-4 monedas:</strong> Remover opción incorrecta (máx 3 por pregunta)</span>
+                  <span><strong>Rosa / 1-4 monedas:</strong> Remover opción incorrecta (máx 3)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-base">🎁</span>
-                  <span><strong>Cualquier regalo de 5+ monedas:</strong> Salta la pregunta inmediatamente</span>
+                  <span><strong>Regalo 5+ monedas:</strong> Salta la pregunta</span>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 pt-1">
@@ -587,7 +601,7 @@ export default function Trivia() {
               </div>
             </div>
 
-            {/* 5. Acciones y Gestión */}
+            {/* Acciones y Gestión */}
             <div className="space-y-2">
               <label className="font-bold text-slate-200 flex items-center gap-1.5">
                 <Sliders className="w-4 h-4 text-emerald-400" />
@@ -627,7 +641,7 @@ export default function Trivia() {
         </div>
       )}
 
-      {/* Main Container - Focused purely on the 9:16 Live Stream Screen */}
+      {/* Main Container */}
       <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
         <div className="w-full max-w-[480px] flex flex-col items-center">
           <TriviaOverlay916
