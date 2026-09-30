@@ -26,18 +26,18 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { io as socketIOClient } from 'socket.io-client';
-import { useAuth } from '../context/AuthContext'; // <-- 1. IMPORTAR AUTENTICACIÓN
+import { useAuth } from '../context/AuthContext';
 
 export default function Trivia() {
-  // Obtener la información del usuario autenticado
   const { user, userProfile, isAdmin } = useAuth();
   
-  // Usuario de TikTok registrado y autorizado en la cuenta
-  const registeredTikTok = userProfile?.tiktokUsername?.trim().replace(/^@/, '') || '';
-
-  // Check if URL has ?obs=true or ?obs=1
+  // Parámetros de URL
   const searchParams = new URLSearchParams(window.location.search);
   const isDirectObsUrl = searchParams.get('obs') === 'true' || searchParams.get('obs') === '1';
+  const urlUser = searchParams.get('user')?.trim().replace(/^@/, '') || '';
+
+  // Usuario asignado: Primero busca el perfil registrado en Firebase; si no, el de la URL
+  const targetTikTokUser = userProfile?.tiktokUsername?.trim().replace(/^@/, '') || urlUser;
 
   const [isObsMode, setIsObsMode] = useState<boolean>(isDirectObsUrl);
   const [isTransparentBg, setIsTransparentBg] = useState<boolean>(false);
@@ -45,29 +45,29 @@ export default function Trivia() {
   const [targetPoints, setTargetPoints] = useState<number>(50);
   const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
 
-  // TikTok connection status (Pre-cargamos su usuario si lo tiene registrado)
+  // TikTok connection status inicializado con su usuario bloqueado
   const [tikTokStatus, setTikTokStatus] = useState<TikTokStatus>({
     estado: 'desconectado',
-    username: registeredTikTok ? `@${registeredTikTok}` : '',
-    mensaje: registeredTikTok 
-      ? `Cuenta autorizada: @${registeredTikTok}. Pulsa Conectar.`
+    username: targetTikTokUser ? `@${targetTikTokUser}` : '',
+    mensaje: targetTikTokUser 
+      ? `Cuenta autorizada: @${targetTikTokUser}. Pulsa Conectar.`
       : 'Ingresa tu usuario de TikTok y pulsa Conectar',
     viewerCount: 0,
     roomId: null,
   });
 
-  // Si los datos del perfil tardan un segundo en cargar de Firebase, actualizar el estado
+  // Si el perfil de Firebase tarda unos milisegundos en cargar, actualizar el estado
   useEffect(() => {
-    if (registeredTikTok && tikTokStatus.estado === 'desconectado' && !tikTokStatus.username) {
+    if (targetTikTokUser && tikTokStatus.estado === 'desconectado' && !tikTokStatus.username) {
       setTikTokStatus((prev) => ({
         ...prev,
-        username: `@${registeredTikTok}`,
-        mensaje: `Cuenta autorizada: @${registeredTikTok}. Pulsa Conectar.`,
+        username: `@${targetTikTokUser}`,
+        mensaje: `Cuenta autorizada: @${targetTikTokUser}. Pulsa Conectar.`,
       }));
     }
-  }, [registeredTikTok, tikTokStatus.estado, tikTokStatus.username]);
+  }, [targetTikTokUser, tikTokStatus.estado, tikTokStatus.username]);
 
-  // Data states: 100+ preguntas barajadas aleatoriamente desde el inicio
+  // Data states
   const [questions, setQuestions] = useState<TriviaQuestion[]>(() => {
     try {
       localStorage.removeItem('tt_trivia_questions');
@@ -110,11 +110,9 @@ export default function Trivia() {
     }
   });
 
-  // Modals state
   const [isGlobalRankOpen, setIsGlobalRankOpen] = useState(false);
   const [isQuestionsModalOpen, setIsQuestionsModalOpen] = useState(false);
 
-  // Sync to localStorage
   useEffect(() => {
     try {
       localStorage.setItem('tt_trivia_questions_v2', JSON.stringify(questions));
@@ -133,7 +131,6 @@ export default function Trivia() {
     } catch {}
   }, [globalRankings]);
 
-  // Handle player score progression
   const handlePlayerScoreUpdate = (playerId: string, addedPoints: number, won: boolean) => {
     setTopPlayers((prev) => {
       const updated = prev.map((p) => {
@@ -151,22 +148,18 @@ export default function Trivia() {
     });
   };
 
-  // Add Question
   const handleAddQuestion = (q: TriviaQuestion) => {
     setQuestions((prev) => [...prev, q]);
   };
 
-  // Delete Question
   const handleDeleteQuestion = (id: string) => {
     setQuestions((prev) => prev.filter((q) => q.id !== id));
   };
 
-  // Reset Questions to defaults
   const handleResetQuestions = () => {
     setQuestions(INITIAL_QUESTIONS);
   };
 
-  // Add score to global rank
   const handleAddGlobalScore = (
     username: string,
     score: number,
@@ -184,7 +177,6 @@ export default function Trivia() {
     setGlobalRankings((prev) => [newEntry, ...prev]);
   };
 
-  // Reset tournament
   const handleResetTournament = () => {
     try {
       localStorage.removeItem('tt_trivia_players_real');
@@ -218,7 +210,6 @@ export default function Trivia() {
     });
   };
 
-  // Handle real TikTok viewer vote arrival
   const handleRealTikTokVote = useCallback((usuario: string, foto: string, respuesta: 'A' | 'B' | 'C' | 'D') => {
     const cleanUser = (usuario || '').toLowerCase().trim().replace(/^@/, '');
     if (!cleanUser) return;
@@ -270,30 +261,27 @@ export default function Trivia() {
     });
   }, []);
 
-  // -------------------------------------------------------------
-  // CANDADO DE SEGURIDAD AL CONECTAR CON TIKTOK
-  // -------------------------------------------------------------
+  // Candado estricto al pulsar conectar
   const handleConnectTikTok = async (inputUsername: string) => {
     const cleanInput = (inputUsername || '').trim().replace(/^@/, '').toLowerCase();
-    const cleanRegistered = registeredTikTok.toLowerCase();
+    const cleanTarget = targetTikTokUser.toLowerCase();
 
-    // CANDADO 1: Si no es admin y tiene cuenta registrada, OBLIGATORIAMENTE se usa la suya
-    if (!isAdmin && cleanRegistered && cleanInput !== cleanRegistered) {
-      alert(`Tu licencia está vinculada exclusivamente a la cuenta @${registeredTikTok}. No puedes conectar cuentas de terceros.`);
+    // Si no es admin y ya tiene usuario asignado, no puede conectar otra cuenta
+    if (!isAdmin && cleanTarget && cleanInput !== cleanTarget) {
+      alert(`Tu cuenta está vinculada a @${targetTikTokUser}. No puedes conectar cuentas ajenas.`);
       return;
     }
 
-    // Usuario definitivo a conectar
-    const targetUsername = (!isAdmin && cleanRegistered) ? registeredTikTok : cleanInput;
+    const finalUsername = (!isAdmin && cleanTarget) ? targetTikTokUser : cleanInput;
 
-    if (!targetUsername) {
-      alert('Por favor ingresa un usuario de TikTok válido.');
+    if (!finalUsername) {
+      alert('Ingresa un usuario de TikTok válido.');
       return;
     }
 
     setTikTokStatus({
       estado: 'conectando',
-      username: `@${targetUsername}`,
+      username: `@${finalUsername}`,
       mensaje: `Conectando con TikTok...`,
       viewerCount: 0,
       roomId: null,
@@ -303,7 +291,7 @@ export default function Trivia() {
       const res = await fetch('/api/tiktok/conectar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: targetUsername }),
+        body: JSON.stringify({ username: finalUsername }),
       });
       const data = await res.json();
       if (data && data.estado) {
@@ -312,7 +300,7 @@ export default function Trivia() {
     } catch {
       const win = window as unknown as { socket?: { emit: (e: string, d: unknown) => void } };
       if (win.socket) {
-        win.socket.emit('conectarTikTok', { username: targetUsername });
+        win.socket.emit('conectarTikTok', { username: finalUsername });
       }
     }
   };
@@ -325,7 +313,7 @@ export default function Trivia() {
     } catch {
       setTikTokStatus({
         estado: 'desconectado',
-        username: registeredTikTok ? `@${registeredTikTok}` : '',
+        username: targetTikTokUser ? `@${targetTikTokUser}` : '',
         mensaje: 'Desconectado del directo.',
         viewerCount: 0,
         roomId: null,
@@ -333,7 +321,6 @@ export default function Trivia() {
     }
   };
 
-  // Socket.IO Listener for real TikTok events
   useEffect(() => {
     let socket: ReturnType<typeof socketIOClient> | null = null;
     try {
@@ -384,7 +371,6 @@ export default function Trivia() {
     };
   }, [handleRealTikTokVote]);
 
-  // Direct OBS Clean Mode View
   if (isObsMode && isDirectObsUrl) {
     return (
       <div
@@ -463,11 +449,12 @@ export default function Trivia() {
         </div>
       </header>
 
-      {/* PROMINENT TIKTOK LIVE CONNECTION BAR */}
+      {/* BARRA DE CONEXIÓN CON CANDADO ACTIVO */}
       <TikTokConnectionBar
         status={tikTokStatus}
         onConnect={handleConnectTikTok}
         onDisconnect={handleDisconnectTikTok}
+        isLocked={!isAdmin && !!targetTikTokUser}
       />
 
       {/* CONFIGURACIÓN DESPLEGABLE */}
