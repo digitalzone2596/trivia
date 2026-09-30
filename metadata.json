@@ -1,0 +1,6 @@
+{
+  "name": "TikTok Live Trivia Arena - OBS Stream Overlay",
+  "description": "Juego interactivo de trivia 9:16 con estética gaming/neón para OBS Browser Source en TikTok Live, con temporizador, efectos de audio, música y podio Top 5 en vivo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

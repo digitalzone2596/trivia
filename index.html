@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>TikTok Live Trivia Arena - OBS Stream Overlay</title>
+    <meta name="description" content="Juego interactivo de trivia 9:16 con estética gaming/neón para OBS Browser Source en TikTok Live, con temporizador, efectos de audio, música y podio Top 5 en vivo." />
+    <meta property="og:title" content="TikTok Live Trivia Arena - OBS Stream Overlay" />
+    <meta property="og:description" content="Juego interactivo de trivia 9:16 con estética gaming/neón para OBS Browser Source en TikTok Live, con temporizador, efectos de audio, música y podio Top 5 en vivo." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,500;0,700;0,800;1,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-slate-950 text-slate-100 antialiased overflow-x-hidden selection:bg-cyan-500 selection:text-black">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Socket.IO Listener para Servidor de TikTok Live / OBS -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      if (typeof io !== 'undefined') {
+        const socket = io();
+
+        // Conectas lo que envía el servidor con las funciones de tu diseño
+        socket.on('estadoJuego', (data) => {
+          if (window.setPregunta && data.pregunta && data.opciones) {
+            window.setPregunta(data.pregunta, data.opciones);
+          }
+          if (window.actualizarRanking && data.ranking) {
+            window.actualizarRanking(data.ranking);
+          }
+          if (window.marcarCorrecta && data.correcta) {
+            window.marcarCorrecta(data.correcta);
+          }
+        });
+
+        socket.on('actualizarTiempo', (tiempo) => {
+          if (window.actualizarTiempo) {
+            window.actualizarTiempo(tiempo);
+          }
+        });
+
+        socket.on('marcarCorrecta', (letra) => {
+          if (window.marcarCorrecta) {
+            window.marcarCorrecta(letra);
+          }
+        });
+
+        socket.on('nuevoComentario', (data) => {
+          if (window.nuevoComentario) {
+            window.nuevoComentario(data.usuario, data.foto, data.mensaje, data.respuesta);
+          }
+        });
+
+        socket.on('voto', (letra) => {
+          if (window.votarOpcion) {
+            window.votarOpcion(letra);
+          }
+        });
+
+        socket.on('ganador', (data) => {
+          if (window.declararGanador) {
+            window.declararGanador(data.usuario, data.foto, data.puntos);
+          }
+        });
+
+        socket.on('reiniciar', () => {
+          if (window.reiniciarJuego) {
+            window.reiniciarJuego();
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
+
