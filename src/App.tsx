@@ -14,6 +14,9 @@ export default function App(): React.JSX.Element {
 
           {/* Tu juego real de trivia conectado a TikTok */}
           <Route path="/trivia" element={<Trivia />} />
+
+          {/* Panel de administración */}
+          <Route path="/admin" element={<AdminPanel />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
