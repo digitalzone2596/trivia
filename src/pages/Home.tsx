@@ -19,8 +19,8 @@ import {
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from './context/AuthContext';
-import TriviaWheelLogo from './components/TriviaWheelLogo';
+import { useAuth } from '../context/AuthContext';
+import TriviaWheelLogo from '../components/TriviaWheelLogo';
 
 interface GameCard {
   id: string;
