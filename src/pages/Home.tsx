@@ -1,4 +1,4 @@
-import React, { useState, useId, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Gamepad2,
@@ -11,19 +11,16 @@ import {
   ArrowRight,
   Monitor,
   Radio,
-  ShieldCheck,
   Shield,
   BellRing,
   LogIn,
   LogOut,
-  User,
   Clock,
-  CheckCircle,
-  X,
-  AlertCircle
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from './context/AuthContext';
+import TriviaWheelLogo from './components/TriviaWheelLogo';
 
 interface GameCard {
   id: string;
@@ -45,7 +42,7 @@ const GAMES: GameCard[] = [
     badgeText: 'DISPONIBLE AHORA',
     description:
       'Preguntas interactivas proyectadas en tu directo. Los espectadores responden con A, B, C o D directamente en el chat y acumulan puntos en tiempo real.',
-    icon: HelpCircle,
+    icon: TriviaWheelLogo,
     tags: ['Lector de chat', 'Podio automático', 'Vertical & Horizontal'],
     route: '/trivia',
     accentColor: 'cyan',
@@ -87,25 +84,13 @@ const GAMES: GameCard[] = [
 
 export default function Home() {
   const navigate = useNavigate();
-  const { user, userProfile, isAdmin, isActive, loginWithGoogle, logout, updateTikTokHandle } = useAuth();
+  const { user, userProfile, isAdmin, isActive, loginWithGoogle, logout } = useAuth();
 
-  const [username, setUsername] = useState('');
   const [copied, setCopied] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
   const [authActionLoading, setAuthActionLoading] = useState(false);
-
-  const inputId = useId();
-
-  // Pre-fill username from profile if available
-  useEffect(() => {
-    if (userProfile?.tiktokUsername && !username) {
-      setUsername(userProfile.tiktokUsername);
-    }
-  }, [userProfile?.tiktokUsername]);
-
-  const cleanUsername = username.trim().replace(/^@+/, '');
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -116,7 +101,7 @@ export default function Home() {
 
   const getGameUrl = (baseRoute: string = '/trivia') => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const targetUser = cleanUsername || userProfile?.tiktokUsername || '';
+    const targetUser = userProfile?.tiktokUsername || '';
     const params = targetUser ? `?user=${encodeURIComponent(targetUser)}` : '';
     return `${origin}${baseRoute}${params}`;
   };
@@ -134,16 +119,7 @@ export default function Home() {
       return;
     }
 
-    // Save TikTok handle if provided
-    if (cleanUsername && cleanUsername !== userProfile?.tiktokUsername) {
-      try {
-        await updateTikTokHandle(cleanUsername);
-      } catch (e) {
-        console.warn('Could not persist tiktok handle', e);
-      }
-    }
-
-    const targetUser = cleanUsername || userProfile?.tiktokUsername || '';
+    const targetUser = userProfile?.tiktokUsername || '';
     const destination = targetUser ? `${route}?user=${encodeURIComponent(targetUser)}` : route;
     navigate(destination);
   };
@@ -250,9 +226,6 @@ export default function Home() {
             <a href="#instrucciones" className="hover:text-white transition-colors">
               Cómo funciona
             </a>
-            <a href="#obs-guia" className="hover:text-white transition-colors">
-              Guía OBS & Studio
-            </a>
           </nav>
 
           {/* Zone 3: Actions & Auth */}
@@ -347,87 +320,25 @@ export default function Home() {
             al siguiente nivel
           </h1>
 
-          <p className="text-base sm:text-lg text-zinc-400 max-w-2xl mb-10 leading-relaxed text-balance">
-            Elige un juego interactivo, ingresa tu usuario de TikTok y proyecta la pantalla en directo.
+          <p className="text-base sm:text-lg text-zinc-400 max-w-2xl mb-8 leading-relaxed text-balance">
+            Elige un juego interactivo, ingresa con tu cuenta y proyecta la pantalla en directo.
             Tus espectadores juegan directamente escribiendo en el chat, sin descargas ni configuraciones complejas.
           </p>
 
-          {/* Central TikTok Username Box */}
-          <div className="w-full max-w-xl p-2 rounded-2xl bg-zinc-900/80 border border-zinc-800/90 shadow-2xl backdrop-blur-xl relative group focus-within:border-cyan-500/60 focus-within:ring-2 focus-within:ring-cyan-500/20 transition-all duration-200">
-            <div className="flex flex-col sm:flex-row items-center gap-2">
-              <div className="relative flex-1 w-full flex items-center">
-                <label htmlFor={inputId} className="sr-only">
-                  Usuario de TikTok
-                </label>
-                <div className="absolute left-3.5 text-cyan-400 font-bold text-base select-none pointer-events-none">
-                  @
-                </div>
-                <input
-                  id={inputId}
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="tu_usuario_de_tiktok (ej: streamer)"
-                  className="w-full bg-zinc-950/70 border border-zinc-800/80 rounded-xl pl-9 pr-24 py-3.5 text-sm sm:text-base text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-400 transition-colors"
-                />
-                {cleanUsername && (
-                  <button
-                    type="button"
-                    onClick={() => setUsername('')}
-                    className="absolute right-3 text-xs text-zinc-400 hover:text-white px-2 py-1 rounded bg-zinc-800/60 hover:bg-zinc-700/60 transition-colors"
-                  >
-                    Borrar
-                  </button>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleLaunchGame('/trivia')}
-                className="w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-cyan-500 to-rose-500 text-zinc-950 hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
-              >
-                <span>Probar Trivia</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Live Username Feedback & Presets */}
-            <div className="mt-3 px-3 py-2 rounded-lg bg-zinc-950/40 border border-zinc-800/50 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-2 text-zinc-400">
-                <span className="text-zinc-500">Estado:</span>
-                {cleanUsername ? (
-                  <span className="text-cyan-400 font-medium flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                    Conectando a @{cleanUsername}
-                  </span>
-                ) : (
-                  <span className="text-zinc-500 italic">
-                    Modo demo (opcional: ingresa tu @ para conectar chat en vivo)
-                  </span>
-                )}
-              </div>
-
-              {!cleanUsername && (
-                <button
-                  type="button"
-                  onClick={() => setUsername('tiktok_streamer')}
-                  className="text-zinc-400 hover:text-cyan-300 transition-colors underline decoration-dotted"
-                >
-                  Usar @tiktok_streamer de prueba
-                </button>
-              )}
-
-              {cleanUsername && (
-                <button
-                  type="button"
-                  onClick={() => handleCopyObsUrl('/trivia')}
-                  className="text-rose-400 hover:text-rose-300 font-medium flex items-center gap-1 transition-colors"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>Copiar link con tu usuario</span>
-                </button>
-              )}
-            </div>
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <a
+              href="#catalogo"
+              className="px-6 py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-cyan-500 to-rose-500 text-zinc-950 hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>Ver Catálogo de Juegos</span>
+              <ArrowRight className="w-4 h-4" />
+            </a>
+            <a
+              href="#instrucciones"
+              className="px-5 py-3.5 rounded-xl font-semibold text-sm bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition-colors flex items-center justify-center gap-2"
+            >
+              <span>Cómo funciona</span>
+            </a>
           </div>
         </section>
 
@@ -468,15 +379,24 @@ export default function Home() {
 
                   <div>
                     <div className="flex items-start justify-between gap-4 mb-5">
-                      <div
-                        className={`w-14 h-14 rounded-xl flex items-center justify-center border transition-transform duration-200 group-hover:scale-105 ${
-                          isActiveCard
-                            ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-lg shadow-cyan-500/10'
-                            : 'bg-zinc-800/50 border-zinc-700/40 text-zinc-400'
-                        }`}
-                      >
-                        <Icon className="w-7 h-7" />
-                      </div>
+                      {game.id === 'trivia' ? (
+                        <div className="relative group/logo">
+                          <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400 opacity-50 blur-md group-hover:opacity-90 transition-opacity" />
+                          <div className="relative w-16 h-16 rounded-2xl overflow-hidden shadow-xl border border-purple-400/40 bg-zinc-950 transition-transform duration-200 group-hover:scale-105">
+                            <TriviaWheelLogo size={64} className="w-full h-full" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          className={`w-14 h-14 rounded-xl flex items-center justify-center border transition-transform duration-200 group-hover:scale-105 ${
+                            isActiveCard
+                              ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-lg shadow-cyan-500/10'
+                              : 'bg-zinc-800/50 border-zinc-700/40 text-zinc-400'
+                          }`}
+                        >
+                          <Icon className="w-7 h-7" />
+                        </div>
+                      )}
 
                       {isActiveCard ? (
                         <div className="flex items-center gap-2 text-xs font-semibold text-cyan-400">
@@ -619,44 +539,6 @@ export default function Home() {
               </div>
               <div className="mt-6 pt-4 border-t border-zinc-800/50 text-xs text-zinc-500 font-mono">
                 Paso 3 de 3 · Browser Source
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* INTERACTIVE OBS SIMULATOR BAR */}
-        <section id="obs-guia" className="w-full rounded-2xl bg-gradient-to-b from-zinc-900 to-zinc-950 border border-zinc-800 p-6 sm:p-8">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="max-w-xl">
-              <div className="inline-flex items-center gap-1.5 text-xs font-mono text-cyan-400 uppercase mb-2">
-                <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                <span>Compatible con OBS Studio, TikTok Live Studio & Streamlabs</span>
-              </div>
-              <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
-                Tu enlace de Browser Source listo para emitir
-              </h3>
-              <p className="text-sm text-zinc-400">
-                Pega este enlace exacto en la propiedad de URL de tu fuente de navegador. El fondo es transparente por defecto.
-              </p>
-            </div>
-
-            <div className="flex-1 max-w-md w-full">
-              <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-between gap-3 font-mono text-xs text-zinc-300">
-                <div className="truncate text-cyan-300 select-all">
-                  {getGameUrl('/trivia')}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleCopyObsUrl('/trivia')}
-                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-sans text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors"
-                >
-                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copied ? 'Copiado' : 'Copiar'}</span>
-                </button>
-              </div>
-              <div className="mt-2 text-[11px] text-zinc-500 flex items-center justify-between">
-                <span>Resolución sugerida: 1080 x 1920 (9:16)</span>
-                <span>FPS: 30 o 60</span>
               </div>
             </div>
           </div>
