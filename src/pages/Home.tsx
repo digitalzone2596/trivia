@@ -53,14 +53,15 @@ const GAMES: GameCard[] = [
     accentColor: 'cyan',
   },
   {
-    id: 'word-guess',
-    title: 'Adivina la Palabra',
-    status: 'SOON',
-    badgeText: 'PRÓXIMAMENTE',
+    id: 'word-cross',
+    title: 'Word Cross / Adivina la Palabra',
+    status: 'ACTIVE',
+    badgeText: 'DISPONIBLE AHORA',
     description:
-      'Minijuego de palabras ocultas y pistas progresivas. El chat intenta descifrar la palabra secreta antes de que el temporizador llegue a cero.',
-    icon: Dices,
-    tags: ['Efectos sonoros', 'Pistas dinámicas', 'Anti-spam inteligente'],
+      'Crucigrama temático interactivo. El chat adivina palabras conectando letras y cada donación de Rosa revela una letra pista en vivo con la foto del donador.',
+    image: '/word-cross-logo.png', // <-- LOGO AGREGADO AQUÍ
+    tags: ['Lector de chat', 'Pistas por Rosas 🌹', 'Vertical 9:16'],
+    route: '/word-cross',
     accentColor: 'pink',
   },
   {
@@ -492,6 +493,7 @@ export default function Home() {
 
                   <div>
                     <div className="flex items-start justify-between gap-4 mb-5">
+                      {/* RENDERIZADO DE LOGO PERSONALIZADO */}
                       {game.image ? (
                         <img
                           src={game.image}
@@ -609,7 +611,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-lg font-bold text-white mb-2">Selecciona el juego</h3>
                 <p className="text-sm text-zinc-400 leading-relaxed">
-                  Elige la dinámica que mejor se adapte a tu stream (ej: Trivia en Vivo). Puedes configurar temas, preguntas y modo de puntuación.
+                  Elige la dinámica que mejor se adapte a tu stream (Trivia en Vivo o Word Cross). Configura tus parámetros y listo.
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-zinc-800/50 text-xs text-zinc-500 font-mono">
