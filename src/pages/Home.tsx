@@ -11,7 +11,6 @@ import {
   ArrowRight,
   Monitor,
   Radio,
-  ShieldCheck,
   Shield,
   BellRing,
   LogIn,
@@ -34,7 +33,7 @@ interface GameCard {
   badgeText: string;
   description: string;
   icon?: React.ComponentType<{ className?: string }>;
-  image?: string; // Logo personalizado
+  image?: string;
   tags: string[];
   route?: string;
   accentColor: 'cyan' | 'pink' | 'violet' | 'amber';
@@ -48,7 +47,7 @@ const GAMES: GameCard[] = [
     badgeText: 'DISPONIBLE AHORA',
     description:
       'Preguntas interactivas proyectadas en tu directo. Los espectadores responden con A, B, C o D directamente en el chat y acumulan puntos en tiempo real.',
-    image: '/trivia-logo.png', // Si lo subiste como .jpg cámbialo a '/trivia-logo.jpg'
+    image: '/trivia-logo.png',
     tags: ['Lector de chat', 'Podio automático', 'Vertical & Horizontal'],
     route: '/trivia',
     accentColor: 'cyan',
@@ -278,9 +277,6 @@ export default function Home() {
             <a href="#instrucciones" className="hover:text-white transition-colors">
               Cómo funciona
             </a>
-            <a href="#obs-guia" className="hover:text-white transition-colors">
-              Guía OBS & Studio
-            </a>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -496,7 +492,6 @@ export default function Home() {
 
                   <div>
                     <div className="flex items-start justify-between gap-4 mb-5">
-                      {/* LOGO DE IMAGEN O ICONO */}
                       {game.image ? (
                         <img
                           src={game.image}
@@ -655,44 +650,6 @@ export default function Home() {
               </div>
               <div className="mt-6 pt-4 border-t border-zinc-800/50 text-xs text-zinc-500 font-mono">
                 Paso 3 de 3 · Browser Source
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* INTERACTIVE OBS SIMULATOR BAR */}
-        <section id="obs-guia" className="w-full rounded-2xl bg-gradient-to-b from-zinc-900 to-zinc-950 border border-zinc-800 p-6 sm:p-8">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="max-w-xl">
-              <div className="inline-flex items-center gap-1.5 text-xs font-mono text-cyan-400 uppercase mb-2">
-                <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                <span>Compatible con OBS Studio, TikTok Live Studio & Streamlabs</span>
-              </div>
-              <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
-                Tu enlace de Browser Source listo para emitir
-              </h3>
-              <p className="text-sm text-zinc-400">
-                Pega este enlace exacto en la propiedad de URL de tu fuente de navegador. El fondo es transparente por defecto.
-              </p>
-            </div>
-
-            <div className="flex-1 max-w-md w-full">
-              <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-between gap-3 font-mono text-xs text-zinc-300">
-                <div className="truncate text-cyan-300 select-all">
-                  {getGameUrl('/trivia')}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleCopyObsUrl('/trivia')}
-                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-sans text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors"
-                >
-                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copied ? 'Copiado' : 'Copiar'}</span>
-                </button>
-              </div>
-              <div className="mt-2 text-[11px] text-zinc-500 flex items-center justify-between">
-                <span>Resolución sugerida: 1080 x 1920 (9:16)</span>
-                <span>FPS: 30 o 60</span>
               </div>
             </div>
           </div>
