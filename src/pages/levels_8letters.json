@@ -1,0 +1,684 @@
+[
+  {
+    "id": 201,
+    "name": "Desafío - ESTRELLA",
+    "letters": [
+      "E",
+      "S",
+      "T",
+      "R",
+      "E",
+      "L",
+      "L",
+      "A"
+    ],
+    "words": [
+      {
+        "id": 1,
+        "word": "ESTRELLA",
+        "row": 0,
+        "col": 0,
+        "dir": "H",
+        "hasStars": true
+      },
+      {
+        "id": 2,
+        "word": "REAL",
+        "row": 0,
+        "col": 3,
+        "dir": "V"
+      },
+      {
+        "id": 3,
+        "word": "TELA",
+        "row": 0,
+        "col": 2,
+        "dir": "V"
+      },
+      {
+        "id": 4,
+        "word": "ARTE",
+        "row": 0,
+        "col": 7,
+        "dir": "V"
+      }
+    ]
+  },
+  {
+    "id": 202,
+    "name": "Desafío - MARIPOSA",
+    "letters": [
+      "M",
+      "A",
+      "R",
+      "I",
+      "P",
+      "O",
+      "S",
+      "A"
+    ],
+    "words": [
+      {
+        "id": 1,
+        "word": "MARIPOSA",
+        "row": 0,
+        "col": 0,
+        "dir": "H",
+        "hasStars": true
+      },
+      {
+        "id": 2,
+        "word": "PRISA",
+        "row": 0,
+        "col": 4,
+        "dir": "V"
+      },
+      {
+        "id": 3,
+        "word": "ROSA",
+        "row": 0,
+        "col": 2,
+        "dir": "V"
+      },
+      {
+        "id": 4,
+        "word": "SOPA",
+        "row": 0,
+        "col": 6,
+        "dir": "V"
+      }
+    ]
+  },
+  {
+    "id": 203,
+    "name": "Desafío - AVENTURA",
+    "letters": [
+      "A",
+      "V",
+      "E",
+      "N",
+      "T",
+      "U",
+      "R",
+      "A"
+    ],
+    "words": [
+      {
+        "id": 1,
+        "word": "AVENTURA",
+        "row": 0,
+        "col": 0,
+        "dir": "H",
+        "hasStars": true
+      },
+      {
+        "id": 2,
+        "word": "VENTA",
+        "row": 0,
+        "col": 1,
+        "dir": "V"
+      },
+      {
+        "id": 3,
+        "word": "RUTA",
+        "row": 0,
+        "col": 6,
+        "dir": "V"
+      },
+      {
+        "id": 4,
+        "word": "NAVE",
+        "row": 0,
+        "col": 3,
+        "dir": "V"
+      }
+    ]
+  },
+  {
+    "id": 204,
+    "name": "Desafío - DIAMANTE",
+    "letters": [
+      "D",
+      "I",
+      "A",
+      "M",
+      "A",
+      "N",
+      "T",
+      "E"
+    ],
+    "words": [
+      {
+        "id": 1,
+        "word": "DIAMANTE",
+        "row": 1,
+        "col": 0,
+        "dir": "H",
+        "hasStars": true
+      },
+      {
+        "id": 2,
+        "word": "DIETA",
+        "row": 1,
+        "col": 0,
+        "dir": "V"
+      },
+      {
+        "id": 3,
+        "word": "MINA",
+        "row": 1,
+        "col": 3,
+        "dir": "V"
+      },
+      {
+        "id": 4,
+        "word": "META",
+        "row": 0,
+        "col": 7,
+        "dir": "V"
+      }
+    ]
+  },
+  {
+    "id": 205,
+    "name": "Desafío - UNIVERSO",
+    "letters": [
+      "U",
+      "N",
+      "I",
+      "V",
+      "E",
+      "R",
+      "S",
+      "O"
+    ],
+    "words": [
+      {
+        "id": 1,
+        "word": "UNIVERSO",
+        "row": 0,
+        "col": 0,
+        "dir": "H",
+        "hasStars": true
+      },
+      {
+        "id": 2,
+        "word": "REINO",
+        "row": 0,
+        "col": 5,
+        "dir": "V"
+      },
+      {
+        "id": 3,
+        "word": "VINO",
+        "row": 0,
+        "col": 3,
+        "dir": "V"
+      },
+      {
+        "id": 4,
+        "word": "SENO",
+        "row": 0,
+        "col": 6,
+        "dir": "V"
+      }
+    ]
+  },
+  {
+    "id": 206,
+    "name": "Desafío - VALIENTE",
+    "letters": [
+      "V",
+      "A",
+      "L",
+      "I",
+      "E",
+      "N",
+      "T",
+      "E"
+    ],
+    "words": [
+      {
+        "id": 1,
+        "word": "VALIENTE",
+        "row": 1,
+        "col": 0,
+        "dir": "H",
+        "hasStars": true
+      },
+      {
+        "id": 2,
+        "word": "LENTE",
+        "row": 1,
+        "col": 2,
+        "dir": "V"
+      },
+      {
+        "id": 3,
+        "word": "VIENE",
+        "row": 1,
+        "col": 0,
+        "dir": "V"
+      },
+      {
+        "id": 4,
+        "word": "VELA",
+        "row": 0,
+        "col": 4,
+        "dir": "V"
+      }
+    ]
+  },
+  {
+    "id": 207,
+    "name": "Desafío - PRINCESA",
+    "letters": [
+      "P",
+      "R",
+      "I",
+      "N",
+      "C",
+      "E",
+      "S",
+      "A"
+    ],
+    "words": [
+      {
+        "id": 1,
+        "word": "PRINCESA",
+        "row": 0,
+        "col": 0,
+        "dir": "H",
+        "hasStars": true
+      },
+      {
+        "id": 2,
+        "word": "PESCA",
+        "row": 0,
+        "col": 0,
+        "dir": "V"
+      },
+      {
+        "id": 3,
+        "word": "REINA",
+        "row": 0,
+        "col": 1,
+        "dir": "V"
+      },
+      {
+        "id": 4,
+        "word": "CENA",
+        "row": 0,
+        "col": 4,
+        "dir": "V"
+      }
+    ]
+  },
+  {
+    "id": 208,
+    "name": "Desafío - MILAGROS",
+    "letters": [
+      "M",
+      "I",
+      "L",
+      "A",
+      "G",
+      "R",
+      "O",
+      "S"
+    ],
+    "words": [
+      {
+        "id": 1,
+        "word": "MILAGROS",
+        "row": 0,
+        "col": 0,
+        "dir": "H",
+        "hasStars": true
+      },
+      {
+        "id": 2,
+        "word": "GLORIA",
+        "row": 0,
+        "col": 4,
+        "dir": "V"
+      },
+      {
+        "id": 3,
+        "word": "MORA",
+        "row": 0,
+        "col": 0,
+        "dir": "V"
+      },
+      {
+        "id": 4,
+        "word": "ROSA",
+        "row": 0,
+        "col": 5,
+        "dir": "V"
+      }
+    ]
+  },
+  {
+    "id": 209,
+    "name": "Desafío - VICTORIA",
+    "letters": [
+      "V",
+      "I",
+      "C",
+      "T",
+      "O",
+      "R",
+      "I",
+      "A"
+    ],
+    "words": [
+      {
+        "id": 1,
+        "word": "VICTORIA",
+        "row": 0,
+        "col": 0,
+        "dir": "H",
+        "hasStars": true
+      },
+      {
+        "id": 2,
+        "word": "ROCA",
+        "row": 0,
+        "col": 5,
+        "dir": "V"
+      },
+      {
+        "id": 3,
+        "word": "TIRA",
+        "row": 0,
+        "col": 3,
+        "dir": "V"
+      },
+      {
+        "id": 4,
+        "word": "CITA",
+        "row": 0,
+        "col": 2,
+        "dir": "V"
+      }
+    ]
+  },
+  {
+    "id": 210,
+    "name": "Desafío - MISTERIO",
+    "letters": [
+      "M",
+      "I",
+      "S",
+      "T",
+      "E",
+      "R",
+      "I",
+      "O"
+    ],
+    "words": [
+      {
+        "id": 1,
+        "word": "MISTERIO",
+        "row": 0,
+        "col": 0,
+        "dir": "H",
+        "hasStars": true
+      },
+      {
+        "id": 2,
+        "word": "METRO",
+        "row": 0,
+        "col": 0,
+        "dir": "V"
+      },
+      {
+        "id": 3,
+        "word": "RITO",
+        "row": 0,
+        "col": 5,
+        "dir": "V"
+      },
+      {
+        "id": 4,
+        "word": "SITIO",
+        "row": 0,
+        "col": 2,
+        "dir": "V"
+      }
+    ]
+  },
+  {
+    "id": 211,
+    "name": "Desafío - CAMPEONA",
+    "letters": [
+      "C",
+      "A",
+      "M",
+      "P",
+      "E",
+      "O",
+      "N",
+      "A"
+    ],
+    "words": [
+      {
+        "id": 1,
+        "word": "CAMPEONA",
+        "row": 1,
+        "col": 0,
+        "dir": "H",
+        "hasStars": true
+      },
+      {
+        "id": 2,
+        "word": "CAMPO",
+        "row": 1,
+        "col": 0,
+        "dir": "V"
+      },
+      {
+        "id": 3,
+        "word": "POEMA",
+        "row": 1,
+        "col": 3,
+        "dir": "V"
+      },
+      {
+        "id": 4,
+        "word": "PENA",
+        "row": 0,
+        "col": 4,
+        "dir": "V"
+      }
+    ]
+  },
+  {
+    "id": 212,
+    "name": "Desafío - GUARDIAN",
+    "letters": [
+      "G",
+      "U",
+      "A",
+      "R",
+      "D",
+      "I",
+      "A",
+      "N"
+    ],
+    "words": [
+      {
+        "id": 1,
+        "word": "GUARDIAN",
+        "row": 0,
+        "col": 0,
+        "dir": "H",
+        "hasStars": true
+      },
+      {
+        "id": 2,
+        "word": "GUIA",
+        "row": 0,
+        "col": 0,
+        "dir": "V"
+      },
+      {
+        "id": 3,
+        "word": "RANA",
+        "row": 0,
+        "col": 3,
+        "dir": "V"
+      },
+      {
+        "id": 4,
+        "word": "DUNA",
+        "row": 0,
+        "col": 4,
+        "dir": "V"
+      }
+    ]
+  },
+  {
+    "id": 213,
+    "name": "Desafío - CASTILLO",
+    "letters": [
+      "C",
+      "A",
+      "S",
+      "T",
+      "I",
+      "L",
+      "L",
+      "O"
+    ],
+    "words": [
+      {
+        "id": 1,
+        "word": "CASTILLO",
+        "row": 0,
+        "col": 0,
+        "dir": "H",
+        "hasStars": true
+      },
+      {
+        "id": 2,
+        "word": "COLA",
+        "row": 0,
+        "col": 0,
+        "dir": "V"
+      },
+      {
+        "id": 3,
+        "word": "TILA",
+        "row": 0,
+        "col": 3,
+        "dir": "V"
+      },
+      {
+        "id": 4,
+        "word": "LISTO",
+        "row": 0,
+        "col": 5,
+        "dir": "V"
+      }
+    ]
+  },
+  {
+    "id": 214,
+    "name": "Desafío - CARAMELO",
+    "letters": [
+      "C",
+      "A",
+      "R",
+      "A",
+      "M",
+      "E",
+      "L",
+      "O"
+    ],
+    "words": [
+      {
+        "id": 1,
+        "word": "CARAMELO",
+        "row": 0,
+        "col": 0,
+        "dir": "H",
+        "hasStars": true
+      },
+      {
+        "id": 2,
+        "word": "CALOR",
+        "row": 0,
+        "col": 0,
+        "dir": "V"
+      },
+      {
+        "id": 3,
+        "word": "MORA",
+        "row": 0,
+        "col": 4,
+        "dir": "V"
+      },
+      {
+        "id": 4,
+        "word": "RAMA",
+        "row": 0,
+        "col": 2,
+        "dir": "V"
+      }
+    ]
+  },
+  {
+    "id": 215,
+    "name": "Desafío - FANTASIA",
+    "letters": [
+      "F",
+      "A",
+      "N",
+      "T",
+      "A",
+      "S",
+      "I",
+      "A"
+    ],
+    "words": [
+      {
+        "id": 1,
+        "word": "FANTASIA",
+        "row": 0,
+        "col": 0,
+        "dir": "H",
+        "hasStars": true
+      },
+      {
+        "id": 2,
+        "word": "SANTA",
+        "row": 0,
+        "col": 5,
+        "dir": "V"
+      },
+      {
+        "id": 3,
+        "word": "TASA",
+        "row": 0,
+        "col": 3,
+        "dir": "V"
+      },
+      {
+        "id": 4,
+        "word": "NATA",
+        "row": 0,
+        "col": 2,
+        "dir": "V"
+      },
+      {
+        "id": 5,
+        "word": "AFAN",
+        "row": 0,
+        "col": 1,
+        "dir": "V"
+      }
+    ]
+  }
+]
