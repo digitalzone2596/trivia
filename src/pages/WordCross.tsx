@@ -29,7 +29,6 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 
-// Archivos auxiliares creados en Google AI Studio (asegúrate de colocarlos en su ruta relativa)
 import { ADDITIONAL_100_LEVELS } from './additionalLevels';
 import { CHALLENGE_8_LEVELS } from './levels8';
 import { backgroundMusic, MUSIC_TRACKS } from './audio/backgroundMusic';
@@ -157,6 +156,14 @@ export const getAvatarUrl = (user: string, avatarUrl?: string): string => {
   return `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user)}`;
 };
 
+// Helper para normalizar acentos y tildes
+const cleanNormalize = (text: string) =>
+  (text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .trim();
+
 /* ========================================================
    FOLLAJE DE ESQUINAS
    ======================================================== */
@@ -257,7 +264,6 @@ export default function WordCross() {
 
   const currentLevel = LEVELS[levelIndex] || LEVELS[0];
 
-  // Actualizar usuario si carga desde Auth
   useEffect(() => {
     if (targetTikTokUser && !tiktokUsername) {
       setTiktokUsername(targetTikTokUser);
@@ -745,18 +751,19 @@ export default function WordCross() {
   }, [gridCells, solvedWordIds, revealedCellKeys, currentLevel, playRoseChime, playSuccessChord, playFanfare, triggerStarParticleBurst]);
 
   /* ========================================================
-     ADIVINAR PALABRA DESDE EL CHAT
+     ADIVINAR PALABRA DESDE EL CHAT (CON NORMALIZACIÓN DE ACENTOS)
      ======================================================== */
   const guessWord = useCallback((rawWord: string, username = 'Jugador', avatar?: string) => {
     if (!rawWord || typeof rawWord !== 'string') return;
-    const cleanWord = rawWord.trim().toUpperCase();
+    const cleanWord = cleanNormalize(rawWord);
 
     if (cleanWord === 'SHUFFLE' || cleanWord === 'MEZCLAR' || cleanWord === 'GIRA') {
       triggerShuffle(username);
       return;
     }
 
-    const targetWord = currentLevel.words.find(w => w.word.toUpperCase() === cleanWord);
+    // Compara normalizando ambos lados (resuelve problemas de tildes)
+    const targetWord = currentLevel.words.find(w => cleanNormalize(w.word) === cleanWord);
     if (!targetWord || solvedWordIds.has(targetWord.id)) {
       setSelectedIndices([]);
       return;
@@ -799,7 +806,7 @@ export default function WordCross() {
     const notifId = `${Date.now()}-${Math.random()}`;
     setNotifications(prev => [
       ...prev,
-      { id: notifId, type: 'word', username, avatar: userAvatar, word: cleanWord }
+      { id: notifId, type: 'word', username, avatar: userAvatar, word: targetWord.word }
     ]);
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== notifId));
@@ -814,7 +821,7 @@ export default function WordCross() {
   }, [currentLevel, solvedWordIds, triggerShuffle, playSuccessChord, playTileFlip, playFanfare, triggerStarParticleBurst]);
 
   /* ========================================================
-     CONEXIÓN SOCKET.IO UNIVERSAL CON SERVER.JS
+     CONEXIÓN SOCKET.IO CON SERVER.JS
      ======================================================== */
   const handleConnectTikTok = useCallback(async (targetHandle?: string) => {
     const handleToConnect = (targetHandle || tiktokUsername || targetTikTokUser).trim().replace(/^@/, '');
@@ -822,7 +829,6 @@ export default function WordCross() {
 
     setConnectionStatus('connecting');
 
-    // Avisar por Socket.IO al servidor
     if (socketRef.current) {
       socketRef.current.emit('unirseSalaStreamer', { username: handleToConnect });
       socketRef.current.emit('conectarTikTok', { username: handleToConnect });
@@ -838,6 +844,8 @@ export default function WordCross() {
       if (data?.estado === 'conectado') {
         setConnectionStatus('connected');
         setConnectedRoom(handleToConnect);
+      } else if (data?.estado === 'error') {
+        setConnectionStatus('error');
       }
     } catch {
       // Manejado vía socket
@@ -860,10 +868,18 @@ export default function WordCross() {
     setConnectedRoom(null);
   }, [connectedRoom, tiktokUsername]);
 
-  // Listener de eventos del Socket
+  // Listener del Socket con doble compatibilidad y auto-join
   useEffect(() => {
     const socket = socketIOClient();
     socketRef.current = socket;
+
+    // Unirse a la sala inmediatamente al conectar
+    socket.on('connect', () => {
+      const currentHandle = (targetTikTokUser || tiktokUsername).trim().replace(/^@/, '');
+      if (currentHandle) {
+        socket.emit('unirseSalaStreamer', { username: currentHandle });
+      }
+    });
 
     // 1. Estado de conexión
     socket.on('tiktokEstado', (data: { estado: 'desconectado' | 'conectando' | 'conectado' | 'error'; username?: string }) => {
@@ -881,10 +897,12 @@ export default function WordCross() {
     });
 
     // 2. Chat universal de TikTok (adivinar palabras)
-    socket.on('tiktokChat', (data: { usuario: string; mensaje: string; foto?: string }) => {
-      const user = data.usuario.replace(/^@/, '');
-      const comment = (data.mensaje || '').trim();
-      const avatar = data.foto;
+    const handleIncomingChat = (data: { usuario?: string; user?: string; mensaje?: string; comment?: string; foto?: string; avatar?: string }) => {
+      const user = (data.usuario || data.user || '').replace(/^@/, '');
+      const comment = (data.mensaje || data.comment || '').trim();
+      const avatar = data.foto || data.avatar;
+
+      if (!comment) return;
 
       if (comment.toLowerCase() === 'shuffle' || comment.toLowerCase() === 'mezclar') {
         triggerShuffle(user);
@@ -896,14 +914,17 @@ export default function WordCross() {
           }
         });
       }
-    });
+    };
+
+    socket.on('tiktokChat', handleIncomingChat);
+    socket.on('comentarioTikTokReal', handleIncomingChat); // Respaldo para Trivia y multi-versión
 
     // 3. Regalos (Rosas = 1 letra pista)
-    socket.on('tiktokRegalo', (data: { usuario: string; foto?: string; regalo: string; monedas?: number; cantidad?: number }) => {
-      const user = data.usuario.replace(/^@/, '');
-      const avatar = data.foto;
-      const giftName = String(data.regalo || '').toLowerCase();
-      const count = data.cantidad || 1;
+    const handleIncomingGift = (data: { usuario?: string; user?: string; foto?: string; avatar?: string; regalo?: string; giftName?: string; monedas?: number; cantidad?: number; repeatCount?: number }) => {
+      const user = (data.usuario || data.user || '').replace(/^@/, '');
+      const avatar = data.foto || data.avatar;
+      const giftName = String(data.regalo || data.giftName || '').toLowerCase();
+      const count = data.cantidad || data.repeatCount || 1;
 
       if (giftName.includes('rose') || giftName.includes('rosa') || (data.monedas && data.monedas <= 4)) {
         for (let i = 0; i < Math.min(count, 5); i++) {
@@ -912,12 +933,22 @@ export default function WordCross() {
           }, i * 350);
         }
       }
-    });
+    };
+
+    socket.on('tiktokRegalo', handleIncomingGift);
+    socket.on('tiktokDonacion', handleIncomingGift); // Respaldo para Trivia y multi-versión
 
     return () => {
       socket.disconnect();
     };
-  }, [triggerShuffle, guessWord, triggerRoseSingleLetterHint]);
+  }, [triggerShuffle, guessWord, triggerRoseSingleLetterHint, targetTikTokUser, tiktokUsername]);
+
+  // Si cambia el usuario autorizado, sincronizar la sala del socket
+  useEffect(() => {
+    if (socketRef.current && targetTikTokUser) {
+      socketRef.current.emit('unirseSalaStreamer', { username: targetTikTokUser });
+    }
+  }, [targetTikTokUser]);
 
   // Autoconexión en OBS mediante Key (?key=...)
   useEffect(() => {
