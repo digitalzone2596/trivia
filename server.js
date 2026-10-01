@@ -15,11 +15,17 @@ process.on('unhandledRejection', (reason) => {
   console.warn('[Advertencia - UnhandledRejection]:', reason);
 });
 
-// Importar conector moderno de TikTok Live
+// API Key de Euler Stream (toma variable de entorno si existe o usa la tuya por defecto)
+const EULER_API_KEY = process.env.EULER_API_KEY || 'euler_NTE1MWIwYmUzY2ExZmYyMDMyNjVhY2E3OTkwMTU4MTU4ZmJkYjhkZTM0Y2Y0MjQwOTA0Zjhi';
+
+// Importar conector moderno de TikTok Live y configurar clave de firmas
 let TikTokLiveConnectionClass = null;
 try {
   const mod = await import('tiktok-live-connector');
   TikTokLiveConnectionClass = mod.TikTokLiveConnection || mod.default;
+  if (mod.SignConfig) {
+    mod.SignConfig.apiKey = EULER_API_KEY;
+  }
 } catch (e) {
   console.error('[Error Crítico]: No se pudo cargar tiktok-live-connector:', e.message);
 }
@@ -119,16 +125,16 @@ function procesarChat(streamer, data) {
     timestamp: Date.now(),
   };
 
-  // A) EVENTO UNIVERSAL: Para juegos como "Adivina la Palabra", Ruleta de retos o Chat en pantalla
+  // A) EVENTO UNIVERSAL: Para juegos como Word Cross, Ruleta o Chat en pantalla
   io.to(room).emit('tiktokChat', payloadUniversal);
 
-  // B) RETROCOMPATIBILIDAD CON TRIVIA: Estructura exacta que espera tu TriviaOverlay actual
+  // B) RETROCOMPATIBILIDAD CON TRIVIA: Estructura exacta que espera tu TriviaOverlay
   const payloadTrivia = {
     ...payloadUniversal,
     respuesta: detectedAnswer,
   };
   io.to(room).emit('comentarioTikTokReal', payloadTrivia);
-  io.emit('comentarioTikTokReal', payloadTrivia); // Emisión global de respaldo
+  io.emit('comentarioTikTokReal', payloadTrivia);
 
   if (detectedAnswer) {
     io.to(room).emit('voto', detectedAnswer);
@@ -141,7 +147,7 @@ function procesarChat(streamer, data) {
 
 /**
  * 2. PROCESAMIENTO UNIVERSAL DE DONACIONES Y REGALOS
- * Extrae diamantes/repeticiones para guerras de likes/ruletas y mantiene comodines de Trivia.
+ * Extrae diamantes/repeticiones para guerras de likes/ruletas y comodines de Trivia.
  */
 function procesarRegalo(streamer, data) {
   if (!data) return;
@@ -175,11 +181,10 @@ function procesarRegalo(streamer, data) {
     monedas: totalCost,
     diamantesUnitarios: diamonds,
     cantidad: repeatCount,
-    accion: accionTrivia, // Compatibilidad con Trivia
+    accion: accionTrivia,
     timestamp: Date.now(),
   };
 
-  // Evento universal y evento de Trivia
   io.to(room).emit('tiktokRegalo', payloadRegalo);
   io.to(room).emit('tiktokDonacion', payloadRegalo);
   io.emit('tiktokDonacion', payloadRegalo);
@@ -187,7 +192,6 @@ function procesarRegalo(streamer, data) {
 
 /**
  * 3. PROCESAMIENTO DE LIKES / TAPS
- * Fundamental para juegos tipo "Guerra de Equipos / Tug-of-war"
  */
 function procesarLikes(streamer, data) {
   if (!data) return;
@@ -249,9 +253,10 @@ async function conectarTikTok(rawUsername, socketId = null) {
   try {
     const ttConn = new TikTokLiveConnectionClass(cleanUser, {
       processInitialData: false,
-      enableExtendedGiftInfo: true,
+      enableExtendedGiftInfo: false, // En false para evitar la llamada restringida a planes Business
       enableWebsocketUpgrade: true,
       requestPollingIntervalMs: 1000,
+      signApiKey: EULER_API_KEY,      // Firma autenticada mediante tu API Key
     });
 
     const state = await ttConn.connect();
@@ -371,14 +376,12 @@ function desconectarTikTok(rawUsername) {
 // ENDPOINTS REST
 // -------------------------------------------------------------
 
-// Consultar estado (por parámetro ?username= o el primero disponible)
 app.get('/api/tiktok/estado', (req, res) => {
   const queryUser = (req.query.username || '').toLowerCase().replace(/^@/, '');
   if (queryUser && activeStreams.has(queryUser)) {
     return res.json(activeStreams.get(queryUser).status);
   }
 
-  // Devolver el primero activo o estado desconectado
   const firstActive = activeStreams.values().next().value;
   res.json(
     firstActive
@@ -405,7 +408,6 @@ app.post('/api/tiktok/desconectar', (req, res) => {
   res.json(status);
 });
 
-// Endpoint para consultar canales transmitiendo en vivo a la vez
 app.get('/api/tiktok/activos', (req, res) => {
   const activos = Array.from(activeStreams.keys()).map((user) => ({
     username: `@${user}`,
@@ -419,14 +421,12 @@ app.get('/api/tiktok/activos', (req, res) => {
 // SOCKET.IO: SALAS Y CONTROL DE EVENTOS
 // -------------------------------------------------------------
 io.on('connection', (socket) => {
-  // Unirse a la sala aislada de un streamer específico
   socket.on('unirseSalaStreamer', ({ username }) => {
     if (!username) return;
     const cleanUser = username.toLowerCase().replace(/^@/, '');
     const room = `streamer_${cleanUser}`;
     socket.join(room);
 
-    // Enviar el estado actual de esa sala si ya estaba conectado
     if (activeStreams.has(cleanUser)) {
       socket.emit('tiktokEstado', activeStreams.get(cleanUser).status);
     }
@@ -442,7 +442,6 @@ io.on('connection', (socket) => {
     desconectarTikTok(data?.username);
   });
 
-  // Eventos de control / comodines (Trivia y simulaciones)
   socket.on('emitirPregunta', (data) => io.emit('estadoJuego', data));
   socket.on('emitirCorrecta', (letra) => io.emit('marcarCorrecta', letra));
   socket.on('emitirVoto', (letra) => io.emit('voto', letra));
@@ -466,6 +465,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n========================================`);
   console.log(` Servidor TikTok LIVE Game Hub Activo`);
   console.log(` Puerto: http://0.0.0.0:${PORT}`);
-  console.log(` Soporte: Multijuego & Multistreamer`);
+  console.log(` Euler Stream: Activo con API Key`);
   console.log(`========================================\n`);
 });
