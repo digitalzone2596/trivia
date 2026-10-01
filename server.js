@@ -15,7 +15,7 @@ process.on('unhandledRejection', (reason) => {
   console.warn('[Advertencia - UnhandledRejection]:', reason);
 });
 
-// API Key de Euler Stream (toma variable de entorno si existe o usa la tuya por defecto)
+// API Key de Euler Stream
 const EULER_API_KEY = process.env.EULER_API_KEY || 'euler_NTE1MWIwYmUzY2ExZmYyMDMyNjVhY2E3OTkwMTU4MTU4ZmJkYjhkZTM0Y2Y0MjQwOTA0Zjhi';
 
 // Importar conector moderno de TikTok Live y configurar clave de firmas
@@ -45,10 +45,12 @@ app.use(express.static(__dirname));
 
 /**
  * GESTOR DE CONEXIONES ACTIVAS
- * Permite que varios streamers jueguen a la vez sin cruzar comentarios ni donaciones.
  * Estructura: Map<username, { connection, status, roomId, viewerCount } >
  */
 const activeStreams = new Map();
+
+// Caché de deduplicación para regalos (evita retransmisiones duplicadas de TikTok)
+const processedGifts = new Set();
 
 // Helper: Extraer información del usuario emisor
 function extraerUsuario(data) {
@@ -92,7 +94,6 @@ function extraerTextoComentario(data) {
 
 /**
  * 1. PROCESAMIENTO UNIVERSAL DE CHAT
- * Emite tanto el comentario crudo (para juegos de adivinar) como el voto ABCD (para Trivia).
  */
 function procesarChat(streamer, data) {
   if (!data) return;
@@ -125,20 +126,21 @@ function procesarChat(streamer, data) {
     timestamp: Date.now(),
   };
 
-  // A) EVENTO UNIVERSAL: Para juegos como Word Cross, Ruleta o Chat en pantalla
+  // Evento universal para Word Cross y otros juegos
   io.to(room).emit('tiktokChat', payloadUniversal);
 
-  // B) RETROCOMPATIBILIDAD CON TRIVIA: Estructura exacta que espera tu TriviaOverlay
+  // Retrocompatibilidad con Trivia
   const payloadTrivia = {
     ...payloadUniversal,
     respuesta: detectedAnswer,
   };
   io.to(room).emit('comentarioTikTokReal', payloadTrivia);
-  io.emit('comentarioTikTokReal', payloadTrivia);
+  // Respaldo para clientes que no se unieron a la sala
+  io.except(room).emit('comentarioTikTokReal', payloadTrivia);
 
   if (detectedAnswer) {
     io.to(room).emit('voto', detectedAnswer);
-    io.emit('voto', detectedAnswer);
+    io.except(room).emit('voto', detectedAnswer);
     console.log(`[${streamer}] [VOTO TRIVIA] @${username} eligió [${detectedAnswer}]`);
   } else {
     console.log(`[${streamer}] [Chat] @${username}: "${rawText}"`);
@@ -147,10 +149,24 @@ function procesarChat(streamer, data) {
 
 /**
  * 2. PROCESAMIENTO UNIVERSAL DE DONACIONES Y REGALOS
- * Extrae diamantes/repeticiones para guerras de likes/ruletas y comodines de Trivia.
  */
 function procesarRegalo(streamer, data) {
   if (!data) return;
+
+  // 1. FILTRO ANTI-DUPLICADOS DE RÁFAGA (COMBOS DE ROSAS):
+  // En TikTok Live, los regalos streakable (como las Rosas, giftType === 1) envían un evento
+  // por cada pulsación. Solo se procesa cuando la ráfaga concluye (repeatEnd === true).
+  if (data.giftType === 1 && !data.repeatEnd) {
+    return;
+  }
+
+  // 2. FILTRO DE IDENTIFICADOR ÚNICO (Evita retransmisiones automáticas de red)
+  const giftUniqueKey = `${streamer}_${data.user?.uniqueId || data.userId || 'user'}_${data.giftId}_${data.comboCount || data.repeatCount || 1}`;
+  if (processedGifts.has(giftUniqueKey)) {
+    return;
+  }
+  processedGifts.add(giftUniqueKey);
+  setTimeout(() => processedGifts.delete(giftUniqueKey), 3500);
 
   const { username, nombreVisible, foto } = extraerUsuario(data);
   const room = `streamer_${streamer}`;
@@ -185,9 +201,12 @@ function procesarRegalo(streamer, data) {
     timestamp: Date.now(),
   };
 
+  // Emitir a la sala privada del streamer
   io.to(room).emit('tiktokRegalo', payloadRegalo);
   io.to(room).emit('tiktokDonacion', payloadRegalo);
-  io.emit('tiktokDonacion', payloadRegalo);
+
+  // Respaldo para clientes antiguos que no se unieron a la sala
+  io.except(room).emit('tiktokDonacion', payloadRegalo);
 }
 
 /**
@@ -209,7 +228,7 @@ function procesarLikes(streamer, data) {
   };
 
   io.to(room).emit('tiktokLike', payloadLikes);
-  io.emit('tiktokLike', payloadLikes);
+  io.except(room).emit('tiktokLike', payloadLikes);
 }
 
 /**
@@ -248,15 +267,15 @@ async function conectarTikTok(rawUsername, socketId = null) {
   };
 
   io.to(room).emit('tiktokEstado', statusInicial);
-  io.emit('tiktokEstado', statusInicial);
+  io.except(room).emit('tiktokEstado', statusInicial);
 
   try {
     const ttConn = new TikTokLiveConnectionClass(cleanUser, {
       processInitialData: false,
-      enableExtendedGiftInfo: false, // En false para evitar la llamada restringida a planes Business
+      enableExtendedGiftInfo: false,
       enableWebsocketUpgrade: true,
       requestPollingIntervalMs: 1000,
-      signApiKey: EULER_API_KEY,      // Firma autenticada mediante tu API Key
+      signApiKey: EULER_API_KEY,
     });
 
     const state = await ttConn.connect();
@@ -280,42 +299,29 @@ async function conectarTikTok(rawUsername, socketId = null) {
 
     console.log(`\n>>> [TikTok Live Hub] EN VIVO CON @${cleanUser} (Room: ${roomId}) <<<`);
     io.to(room).emit('tiktokEstado', statusConectado);
-    io.emit('tiktokEstado', statusConectado);
+    io.except(room).emit('tiktokEstado', statusConectado);
 
-    // 1. CHAT
+    // 1. CHAT (Manejador único oficial)
     ttConn.on('chat', (data) => procesarChat(cleanUser, data));
 
-    // 2. REGALOS
+    // 2. REGALOS (Manejador único oficial)
     ttConn.on('gift', (data) => procesarRegalo(cleanUser, data));
 
     // 3. LIKES / TAPS
     ttConn.on('like', (data) => procesarLikes(cleanUser, data));
 
-    // 4. PROTOBUF DE RESPALDO
-    ttConn.on('decodedData', (method, decodedData) => {
-      try {
-        if (method === 'WebcastChatMessage' && decodedData?.data) {
-          procesarChat(cleanUser, decodedData.data);
-        } else if (method === 'WebcastGiftMessage' && decodedData?.data) {
-          procesarRegalo(cleanUser, decodedData.data);
-        } else if (method === 'WebcastLikeMessage' && decodedData?.data) {
-          procesarLikes(cleanUser, decodedData.data);
-        }
-      } catch {}
-    });
-
-    // 5. ESPECTADORES
+    // 4. ESPECTADORES
     ttConn.on('roomUser', (data) => {
       const count = data?.viewerCount ?? 0;
       if (count > 0) {
         const streamData = activeStreams.get(cleanUser);
         if (streamData) streamData.status.viewerCount = count;
         io.to(room).emit('tiktokEspectadores', count);
-        io.emit('tiktokEspectadores', count);
+        io.except(room).emit('tiktokEspectadores', count);
       }
     });
 
-    // 6. DESCONEXIÓN
+    // 5. DESCONEXIÓN
     ttConn.on('disconnected', () => {
       desconectarTikTok(cleanUser);
     });
@@ -340,7 +346,7 @@ async function conectarTikTok(rawUsername, socketId = null) {
     };
     activeStreams.delete(cleanUser);
     io.to(room).emit('tiktokEstado', statusError);
-    io.emit('tiktokEstado', statusError);
+    io.except(room).emit('tiktokEstado', statusError);
     return statusError;
   }
 }
@@ -368,7 +374,7 @@ function desconectarTikTok(rawUsername) {
   };
 
   io.to(room).emit('tiktokEstado', statusDesconectado);
-  io.emit('tiktokEstado', statusDesconectado);
+  io.except(room).emit('tiktokEstado', statusDesconectado);
   return statusDesconectado;
 }
 
