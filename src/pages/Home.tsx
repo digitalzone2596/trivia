@@ -146,8 +146,14 @@ export default function Home() {
   const getGameUrl = (baseRoute: string = '/trivia') => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const targetUser = cleanUsername || userProfile?.tiktokUsername || '';
-    const params = targetUser ? `?user=${encodeURIComponent(targetUser)}` : '';
-    return `${origin}${baseRoute}${params}`;
+    
+    // Parámetros: Clave secreta (UID), usuario y modo OBS
+    const params = new URLSearchParams();
+    if (user?.uid) params.set('key', user.uid);
+    if (targetUser) params.set('user', targetUser);
+    params.set('obs', '1');
+
+    return `${origin}${baseRoute}?${params.toString()}`;
   };
 
   const handleLaunchGame = async (route: string) => {

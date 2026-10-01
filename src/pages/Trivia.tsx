@@ -22,22 +22,29 @@ import {
   Radio,
   Target,
   Clock,
-  Wifi,
-  WifiOff,
 } from 'lucide-react';
 import { io as socketIOClient } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export default function Trivia() {
   const { user, userProfile, isAdmin } = useAuth();
-  
+
   // Parámetros de URL
   const searchParams = new URLSearchParams(window.location.search);
+  const obsKey = searchParams.get('key');
   const isDirectObsUrl = searchParams.get('obs') === 'true' || searchParams.get('obs') === '1';
   const urlUser = searchParams.get('user')?.trim().replace(/^@/, '') || '';
 
-  // Usuario asignado: Primero busca el perfil registrado en Firebase; si no, el de la URL
-  const targetTikTokUser = userProfile?.tiktokUsername?.trim().replace(/^@/, '') || urlUser;
+  // Estado para el usuario obtenido por Key en OBS (cuando no hay sesión de Google activa)
+  const [obsTikTokUser, setObsTikTokUser] = useState<string>('');
+
+  // Usuario definitivo asignado
+  const targetTikTokUser =
+    userProfile?.tiktokUsername?.trim().replace(/^@/, '') ||
+    obsTikTokUser ||
+    urlUser;
 
   const [isObsMode, setIsObsMode] = useState<boolean>(isDirectObsUrl);
   const [isTransparentBg, setIsTransparentBg] = useState<boolean>(false);
@@ -49,23 +56,12 @@ export default function Trivia() {
   const [tikTokStatus, setTikTokStatus] = useState<TikTokStatus>({
     estado: 'desconectado',
     username: targetTikTokUser ? `@${targetTikTokUser}` : '',
-    mensaje: targetTikTokUser 
+    mensaje: targetTikTokUser
       ? `Cuenta autorizada: @${targetTikTokUser}. Pulsa Conectar.`
       : 'Ingresa tu usuario de TikTok y pulsa Conectar',
     viewerCount: 0,
     roomId: null,
   });
-
-  // Si el perfil de Firebase tarda unos milisegundos en cargar, actualizar el estado
-  useEffect(() => {
-    if (targetTikTokUser && tikTokStatus.estado === 'desconectado' && !tikTokStatus.username) {
-      setTikTokStatus((prev) => ({
-        ...prev,
-        username: `@${targetTikTokUser}`,
-        mensaje: `Cuenta autorizada: @${targetTikTokUser}. Pulsa Conectar.`,
-      }));
-    }
-  }, [targetTikTokUser, tikTokStatus.estado, tikTokStatus.username]);
 
   // Data states
   const [questions, setQuestions] = useState<TriviaQuestion[]>(() => {
@@ -113,6 +109,18 @@ export default function Trivia() {
   const [isGlobalRankOpen, setIsGlobalRankOpen] = useState(false);
   const [isQuestionsModalOpen, setIsQuestionsModalOpen] = useState(false);
 
+  // Actualizar estado si el perfil de Firebase termina de cargar en el navegador
+  useEffect(() => {
+    if (targetTikTokUser && tikTokStatus.estado === 'desconectado' && !tikTokStatus.username) {
+      setTikTokStatus((prev) => ({
+        ...prev,
+        username: `@${targetTikTokUser}`,
+        mensaje: `Cuenta autorizada: @${targetTikTokUser}. Pulsa Conectar.`,
+      }));
+    }
+  }, [targetTikTokUser, tikTokStatus.estado, tikTokStatus.username]);
+
+  // Sync to localStorage
   useEffect(() => {
     try {
       localStorage.setItem('tt_trivia_questions_v2', JSON.stringify(questions));
@@ -261,18 +269,18 @@ export default function Trivia() {
     });
   }, []);
 
-  // Candado estricto al pulsar conectar
-  const handleConnectTikTok = async (inputUsername: string) => {
+  // Función de conexión con verificación de cuenta autorizada
+  const handleConnectTikTok = useCallback(async (inputUsername: string) => {
     const cleanInput = (inputUsername || '').trim().replace(/^@/, '').toLowerCase();
     const cleanTarget = targetTikTokUser.toLowerCase();
 
     // Si no es admin y ya tiene usuario asignado, no puede conectar otra cuenta
-    if (!isAdmin && cleanTarget && cleanInput !== cleanTarget) {
+    if (!isAdmin && cleanTarget && cleanInput !== cleanTarget && !obsKey) {
       alert(`Tu cuenta está vinculada a @${targetTikTokUser}. No puedes conectar cuentas ajenas.`);
       return;
     }
 
-    const finalUsername = (!isAdmin && cleanTarget) ? targetTikTokUser : cleanInput;
+    const finalUsername = (!isAdmin && cleanTarget) ? targetTikTokUser : (cleanInput || cleanTarget);
 
     if (!finalUsername) {
       alert('Ingresa un usuario de TikTok válido.');
@@ -303,7 +311,7 @@ export default function Trivia() {
         win.socket.emit('conectarTikTok', { username: finalUsername });
       }
     }
-  };
+  }, [isAdmin, targetTikTokUser, obsKey]);
 
   const handleDisconnectTikTok = async () => {
     try {
@@ -321,6 +329,43 @@ export default function Trivia() {
     }
   };
 
+  // Autoconectar en OBS mediante la Llave (?key=...)
+  useEffect(() => {
+    if (!obsKey) return;
+
+    let isMounted = true;
+    async function syncObsStreamer() {
+      try {
+        const snap = await getDoc(doc(db, 'users', obsKey!));
+        if (snap.exists() && isMounted) {
+          const userData = snap.data();
+          const handle = (userData?.tiktokUsername || urlUser || '').trim().replace(/^@/, '');
+          if (handle) {
+            setObsTikTokUser(handle);
+            setTikTokStatus((prev) => ({
+              ...prev,
+              username: `@${handle}`,
+              mensaje: `Conectando automáticamente a @${handle}...`,
+            }));
+
+            // Autoconexión al directo tras 1.2 segundos
+            setTimeout(() => {
+              handleConnectTikTok(handle);
+            }, 1200);
+          }
+        }
+      } catch (err) {
+        console.error('Error al sincronizar streamer en OBS:', err);
+      }
+    }
+
+    syncObsStreamer();
+    return () => {
+      isMounted = false;
+    };
+  }, [obsKey, urlUser, handleConnectTikTok]);
+
+  // Listener de Socket.IO para eventos en vivo
   useEffect(() => {
     let socket: ReturnType<typeof socketIOClient> | null = null;
     try {
@@ -371,6 +416,7 @@ export default function Trivia() {
     };
   }, [handleRealTikTokVote]);
 
+  // Vista limpia para OBS
   if (isObsMode && isDirectObsUrl) {
     return (
       <div
