@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-r
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Home from './pages/Home';
 import Trivia from './pages/Trivia';
+import WordCross from './pages/WordCross';
 import AdminPanel from './pages/AdminPanel';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
@@ -120,6 +121,8 @@ export default function App(): React.JSX.Element {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
+          
+          {/* JUEGO 1: TRIVIA */}
           <Route
             path="/trivia"
             element={
@@ -128,6 +131,17 @@ export default function App(): React.JSX.Element {
               </ProtectedGameRoute>
             }
           />
+
+          {/* JUEGO 2: WORD CROSS (CRUCIGRAMA) */}
+          <Route
+            path="/word-cross"
+            element={
+              <ProtectedGameRoute>
+                <WordCross />
+              </ProtectedGameRoute>
+            }
+          />
+
           <Route path="/admin" element={<AdminPanel />} />
         </Routes>
       </BrowserRouter>
