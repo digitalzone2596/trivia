@@ -22,6 +22,8 @@ import {
   Radio,
   Target,
   Clock,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { io as socketIOClient } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
@@ -37,7 +39,7 @@ export default function Trivia() {
   const isDirectObsUrl = searchParams.get('obs') === 'true' || searchParams.get('obs') === '1';
   const urlUser = searchParams.get('user')?.trim().replace(/^@/, '') || '';
 
-  // Estado para el usuario obtenido por Key en OBS (cuando no hay sesión de Google activa)
+  // Estado para el usuario obtenido por Key en OBS
   const [obsTikTokUser, setObsTikTokUser] = useState<string>('');
 
   // Usuario definitivo asignado
@@ -51,6 +53,7 @@ export default function Trivia() {
   const [timerDuration, setTimerDuration] = useState<number>(15);
   const [targetPoints, setTargetPoints] = useState<number>(50);
   const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
+  const [copiedObs, setCopiedObs] = useState<boolean>(false);
 
   // TikTok connection status inicializado con su usuario bloqueado
   const [tikTokStatus, setTikTokStatus] = useState<TikTokStatus>({
@@ -108,6 +111,23 @@ export default function Trivia() {
 
   const [isGlobalRankOpen, setIsGlobalRankOpen] = useState(false);
   const [isQuestionsModalOpen, setIsQuestionsModalOpen] = useState(false);
+
+  // Generador y copiador del enlace seguro para OBS
+  const handleCopyObsUrl = () => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const params = new URLSearchParams();
+
+    const activeKey = user?.uid || obsKey;
+    if (activeKey) params.set('key', activeKey);
+    if (targetTikTokUser) params.set('user', targetTikTokUser);
+    params.set('obs', '1');
+
+    const fullUrl = `${origin}/trivia?${params.toString()}`;
+    navigator.clipboard.writeText(fullUrl).then(() => {
+      setCopiedObs(true);
+      setTimeout(() => setCopiedObs(false), 2200);
+    });
+  };
 
   // Actualizar estado si el perfil de Firebase termina de cargar en el navegador
   useEffect(() => {
@@ -274,7 +294,6 @@ export default function Trivia() {
     const cleanInput = (inputUsername || '').trim().replace(/^@/, '').toLowerCase();
     const cleanTarget = targetTikTokUser.toLowerCase();
 
-    // Si no es admin y ya tiene usuario asignado, no puede conectar otra cuenta
     if (!isAdmin && cleanTarget && cleanInput !== cleanTarget && !obsKey) {
       alert(`Tu cuenta está vinculada a @${targetTikTokUser}. No puedes conectar cuentas ajenas.`);
       return;
@@ -348,7 +367,6 @@ export default function Trivia() {
               mensaje: `Conectando automáticamente a @${handle}...`,
             }));
 
-            // Autoconexión al directo tras 1.2 segundos
             setTimeout(() => {
               handleConnectTikTok(handle);
             }, 1200);
@@ -416,7 +434,7 @@ export default function Trivia() {
     };
   }, [handleRealTikTokVote]);
 
-  // Vista limpia para OBS
+  // Vista limpia para OBS (Sin menús ni barras de control)
   if (isObsMode && isDirectObsUrl) {
     return (
       <div
@@ -468,7 +486,28 @@ export default function Trivia() {
           </button>
         </nav>
 
+        {/* Zona de Botones Superiores: Incluye el nuevo botón de Copiar URL OBS */}
         <div className="flex items-center gap-2.5">
+          {/* BOTÓN NUEVO: Copiar URL para OBS directamente desde el juego */}
+          <button
+            type="button"
+            onClick={handleCopyObsUrl}
+            title="Copiar enlace directo con tu clave para OBS o TikTok Live Studio"
+            className="px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 transition-all active:scale-95 cursor-pointer shadow-sm shadow-cyan-500/10"
+          >
+            {copiedObs ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-emerald-400">¡URL Copiada!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Copiar URL OBS</span>
+              </>
+            )}
+          </button>
+
           <button
             onClick={() => setIsConfigOpen(!isConfigOpen)}
             className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-2 border transition-all ${
