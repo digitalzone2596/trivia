@@ -938,14 +938,22 @@ export default function WordCross() {
     socket.on('tiktokChat', handleIncomingChat);
     socket.on('comentarioTikTokReal', handleIncomingChat);
 
+    // Variable anti-rebote para evitar procesar el mismo regalo en el mismo segundo
+    let lastGiftTimestamp = 0;
+
     const handleIncomingGift = (data: { usuario?: string; user?: string; foto?: string; avatar?: string; regalo?: string; giftName?: string; monedas?: number; cantidad?: number; repeatCount?: number }) => {
+      const now = Date.now();
+      if (now - lastGiftTimestamp < 400) return;
+      lastGiftTimestamp = now;
+
       const user = (data.usuario || data.user || '').replace(/^@/, '');
       const avatar = data.foto || data.avatar;
       const giftName = String(data.regalo || data.giftName || '').toLowerCase();
-      const count = data.cantidad || data.repeatCount || 1;
+      const count = Number(data.cantidad || data.repeatCount || 1);
 
       if (giftName.includes('rose') || giftName.includes('rosa') || (data.monedas && data.monedas <= 4)) {
-        for (let i = 0; i < Math.min(count, 5); i++) {
+        const totalToReveal = Math.min(Math.max(1, count), 5);
+        for (let i = 0; i < totalToReveal; i++) {
           setTimeout(() => {
             triggerRoseSingleLetterHint(user, avatar);
           }, i * 350);
@@ -953,8 +961,8 @@ export default function WordCross() {
       }
     };
 
+    // Escuchar únicamente tiktokRegalo (sin duplicar)
     socket.on('tiktokRegalo', handleIncomingGift);
-    socket.on('tiktokDonacion', handleIncomingGift);
 
     return () => {
       socket.disconnect();
