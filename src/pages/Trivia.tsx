@@ -465,7 +465,7 @@ export default function Trivia() {
         <div className="flex items-center gap-3">
           <a href="/" className="font-extrabold text-base tracking-tight text-white flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400 animate-pulse" />
-            <span>TikTok Live Trivia Arena</span>
+            <span>Volver al inicio</span>
           </a>
         </div>
 
