@@ -156,7 +156,6 @@ export const getAvatarUrl = (user: string, avatarUrl?: string): string => {
   return `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user)}`;
 };
 
-// Helper para normalizar acentos y tildes
 const cleanNormalize = (text: string) =>
   (text || '')
     .normalize('NFD')
@@ -209,15 +208,13 @@ const CornerFoliage: React.FC<{ position: 'top-left' | 'top-right' | 'bottom-lef
 };
 
 export default function WordCross() {
-  const { user, userProfile, isAdmin } = useAuth();
+  const { user, userProfile } = useAuth();
 
-  // Parámetros URL para OBS
   const searchParams = new URLSearchParams(window.location.search);
   const obsKey = searchParams.get('key');
   const isDirectObsUrl = searchParams.get('obs') === 'true' || searchParams.get('obs') === '1';
   const urlUser = searchParams.get('user')?.trim().replace(/^@/, '') || '';
 
-  // Usuario asignado
   const [obsTikTokUser, setObsTikTokUser] = useState<string>('');
   const targetTikTokUser = userProfile?.tiktokUsername?.trim().replace(/^@/, '') || obsTikTokUser || urlUser;
 
@@ -234,6 +231,28 @@ export default function WordCross() {
   const [isMuted, setIsMuted] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [roseAnimation, setRoseAnimation] = useState<{ id: string; user: string; avatar?: string } | null>(null);
+
+  // Referencias para evitar Stale Closures en WebSockets
+  const solvedWordIdsRef = useRef<Set<number>>(new Set());
+  const revealedCellKeysRef = useRef<Set<string>>(new Set());
+  const wheelLettersRef = useRef<string[]>([]);
+  const selectedIndicesRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    solvedWordIdsRef.current = solvedWordIds;
+  }, [solvedWordIds]);
+
+  useEffect(() => {
+    revealedCellKeysRef.current = revealedCellKeys;
+  }, [revealedCellKeys]);
+
+  useEffect(() => {
+    wheelLettersRef.current = wheelLetters;
+  }, [wheelLetters]);
+
+  useEffect(() => {
+    selectedIndicesRef.current = selectedIndices;
+  }, [selectedIndices]);
 
   // Barra de configuración y modo OBS
   const [isSidebarOpen, setIsSidebarOpen] = useState(!isDirectObsUrl);
@@ -413,6 +432,8 @@ export default function WordCross() {
     const validIdx = ((idx % LEVELS.length) + LEVELS.length) % LEVELS.length;
     setLevelIndex(validIdx);
     setWheelLetters([...LEVELS[validIdx].letters]);
+    solvedWordIdsRef.current = new Set();
+    revealedCellKeysRef.current = new Set();
     setSolvedWordIds(new Set());
     setSolvedWordsMeta({});
     setRevealedCellKeys(new Set());
@@ -664,13 +685,13 @@ export default function WordCross() {
   }, [playWoodTap]);
 
   /* ========================================================
-     PISTA: 1 ROSA = 1 LETRA
+     PISTA: 1 ROSA = 1 LETRA (SIN STALE CLOSURE)
      ======================================================== */
   const triggerRoseSingleLetterHint = useCallback((user = 'Seguidor', avatar?: string) => {
     const unrevealedKeys: string[] = [];
     gridCells.forEach((cell, key) => {
-      const isWordSolved = cell.wordIds.some(wId => solvedWordIds.has(wId));
-      const isIndividuallyRevealed = revealedCellKeys.has(key);
+      const isWordSolved = cell.wordIds.some(wId => solvedWordIdsRef.current.has(wId));
+      const isIndividuallyRevealed = revealedCellKeysRef.current.has(key);
       if (!isWordSolved && !isIndividuallyRevealed) {
         unrevealedKeys.push(key);
       }
@@ -688,8 +709,10 @@ export default function WordCross() {
     setRoseAnimation({ id: `${Date.now()}`, user, avatar: userAvatar });
     setTimeout(() => setRoseAnimation(null), 2200);
 
-    const nextRevealedKeys = new Set(revealedCellKeys);
+    // Actualizar referencia y estado
+    const nextRevealedKeys = new Set(revealedCellKeysRef.current);
     nextRevealedKeys.add(chosenKey);
+    revealedCellKeysRef.current = nextRevealedKeys;
     setRevealedCellKeys(nextRevealedKeys);
 
     if (chosenCell.isStar || currentLevel.words.some(w => w.hasStars && chosenCell.wordIds.includes(w.id))) {
@@ -709,21 +732,24 @@ export default function WordCross() {
 
     setStars(prev => prev + 5);
 
-    const newSolved = new Set(solvedWordIds);
+    // Comprobar si al revelar la letra se completó alguna palabra
+    const nextSolved = new Set(solvedWordIdsRef.current);
     currentLevel.words.forEach(w => {
-      if (!newSolved.has(w.id)) {
+      if (!nextSolved.has(w.id)) {
         let isComplete = true;
         for (let i = 0; i < w.word.length; i++) {
           const r = w.dir === 'H' ? w.row : w.row + i;
           const c = w.dir === 'H' ? w.col + i : w.col;
           const cellKey = `${r},${c}`;
-          if (!nextRevealedKeys.has(cellKey) && !cellKeyEqualsWord(cellKey, newSolved)) {
+          const isKeyRevealed = nextRevealedKeys.has(cellKey);
+          const isWordInKeySolved = gridCells.get(cellKey)?.wordIds.some(id => nextSolved.has(id));
+          if (!isKeyRevealed && !isWordInKeySolved) {
             isComplete = false;
             break;
           }
         }
         if (isComplete) {
-          newSolved.add(w.id);
+          nextSolved.add(w.id);
           setSolvedWordsMeta(prev => ({
             ...prev,
             [w.id]: { wordId: w.id, username: user, avatar: userAvatar }
@@ -732,26 +758,22 @@ export default function WordCross() {
       }
     });
 
-    function cellKeyEqualsWord(key: string, solvedSet: Set<number>) {
-      const c = gridCells.get(key);
-      return c ? c.wordIds.some(id => solvedSet.has(id)) : false;
-    }
-
-    if (newSolved.size > solvedWordIds.size) {
-      setSolvedWordIds(newSolved);
+    if (nextSolved.size > solvedWordIdsRef.current.size) {
+      solvedWordIdsRef.current = nextSolved;
+      setSolvedWordIds(nextSolved);
       playSuccessChord();
     }
 
-    if (currentLevel.words.every(w => newSolved.has(w.id))) {
+    if (currentLevel.words.every(w => nextSolved.has(w.id))) {
       setTimeout(() => {
         setIsLevelCleared(true);
         playFanfare();
       }, 700);
     }
-  }, [gridCells, solvedWordIds, revealedCellKeys, currentLevel, playRoseChime, playSuccessChord, playFanfare, triggerStarParticleBurst]);
+  }, [gridCells, currentLevel, playRoseChime, playSuccessChord, playFanfare, triggerStarParticleBurst]);
 
   /* ========================================================
-     ADIVINAR PALABRA DESDE EL CHAT (CON NORMALIZACIÓN DE ACENTOS)
+     ADIVINAR PALABRA DESDE EL CHAT (SIN STALE CLOSURE)
      ======================================================== */
   const guessWord = useCallback((rawWord: string, username = 'Jugador', avatar?: string) => {
     if (!rawWord || typeof rawWord !== 'string') return;
@@ -762,18 +784,19 @@ export default function WordCross() {
       return;
     }
 
-    // Compara normalizando ambos lados (resuelve problemas de tildes)
     const targetWord = currentLevel.words.find(w => cleanNormalize(w.word) === cleanWord);
-    if (!targetWord || solvedWordIds.has(targetWord.id)) {
+    if (!targetWord || solvedWordIdsRef.current.has(targetWord.id)) {
       setSelectedIndices([]);
       return;
     }
 
     const userAvatar = getAvatarUrl(username, avatar);
 
-    const newSolved = new Set(solvedWordIds);
-    newSolved.add(targetWord.id);
-    setSolvedWordIds(newSolved);
+    const nextSolved = new Set(solvedWordIdsRef.current);
+    nextSolved.add(targetWord.id);
+    solvedWordIdsRef.current = nextSolved;
+    setSolvedWordIds(nextSolved);
+
     setSolvedWordsMeta(prev => ({
       ...prev,
       [targetWord.id]: {
@@ -812,13 +835,13 @@ export default function WordCross() {
       setNotifications(prev => prev.filter(n => n.id !== notifId));
     }, 2800);
 
-    if (currentLevel.words.every(w => newSolved.has(w.id))) {
+    if (currentLevel.words.every(w => nextSolved.has(w.id))) {
       setTimeout(() => {
         setIsLevelCleared(true);
         playFanfare();
       }, 700);
     }
-  }, [currentLevel, solvedWordIds, triggerShuffle, playSuccessChord, playTileFlip, playFanfare, triggerStarParticleBurst]);
+  }, [currentLevel, triggerShuffle, playSuccessChord, playTileFlip, playFanfare, triggerStarParticleBurst]);
 
   /* ========================================================
      CONEXIÓN SOCKET.IO CON SERVER.JS
@@ -868,12 +891,10 @@ export default function WordCross() {
     setConnectedRoom(null);
   }, [connectedRoom, tiktokUsername]);
 
-  // Listener del Socket con doble compatibilidad y auto-join
   useEffect(() => {
     const socket = socketIOClient();
     socketRef.current = socket;
 
-    // Unirse a la sala inmediatamente al conectar
     socket.on('connect', () => {
       const currentHandle = (targetTikTokUser || tiktokUsername).trim().replace(/^@/, '');
       if (currentHandle) {
@@ -881,7 +902,6 @@ export default function WordCross() {
       }
     });
 
-    // 1. Estado de conexión
     socket.on('tiktokEstado', (data: { estado: 'desconectado' | 'conectando' | 'conectado' | 'error'; username?: string }) => {
       if (data.estado === 'conectado') {
         setConnectionStatus('connected');
@@ -896,7 +916,6 @@ export default function WordCross() {
       }
     });
 
-    // 2. Chat universal de TikTok (adivinar palabras)
     const handleIncomingChat = (data: { usuario?: string; user?: string; mensaje?: string; comment?: string; foto?: string; avatar?: string }) => {
       const user = (data.usuario || data.user || '').replace(/^@/, '');
       const comment = (data.mensaje || data.comment || '').trim();
@@ -917,9 +936,8 @@ export default function WordCross() {
     };
 
     socket.on('tiktokChat', handleIncomingChat);
-    socket.on('comentarioTikTokReal', handleIncomingChat); // Respaldo para Trivia y multi-versión
+    socket.on('comentarioTikTokReal', handleIncomingChat);
 
-    // 3. Regalos (Rosas = 1 letra pista)
     const handleIncomingGift = (data: { usuario?: string; user?: string; foto?: string; avatar?: string; regalo?: string; giftName?: string; monedas?: number; cantidad?: number; repeatCount?: number }) => {
       const user = (data.usuario || data.user || '').replace(/^@/, '');
       const avatar = data.foto || data.avatar;
@@ -936,21 +954,19 @@ export default function WordCross() {
     };
 
     socket.on('tiktokRegalo', handleIncomingGift);
-    socket.on('tiktokDonacion', handleIncomingGift); // Respaldo para Trivia y multi-versión
+    socket.on('tiktokDonacion', handleIncomingGift);
 
     return () => {
       socket.disconnect();
     };
   }, [triggerShuffle, guessWord, triggerRoseSingleLetterHint, targetTikTokUser, tiktokUsername]);
 
-  // Si cambia el usuario autorizado, sincronizar la sala del socket
   useEffect(() => {
     if (socketRef.current && targetTikTokUser) {
       socketRef.current.emit('unirseSalaStreamer', { username: targetTikTokUser });
     }
   }, [targetTikTokUser]);
 
-  // Autoconexión en OBS mediante Key (?key=...)
   useEffect(() => {
     if (!obsKey) return;
 
@@ -980,7 +996,6 @@ export default function WordCross() {
     };
   }, [obsKey, urlUser, handleConnectTikTok]);
 
-  // Generador de URL para OBS
   const handleCopyObsUrl = () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const params = new URLSearchParams();
@@ -1026,7 +1041,6 @@ export default function WordCross() {
     }
   }, [isMusicPlaying]);
 
-  // Posiciones dinámicas de las letras
   const letterPositions = React.useMemo(() => {
     const count = wheelLetters.length || 6;
     const centerX = 130;
@@ -1083,13 +1097,11 @@ export default function WordCross() {
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', handlePointerUp);
 
-      setSelectedIndices(currentSel => {
-        const word = currentSel.map(i => wheelLetters[i]).join('');
-        if (word.length >= 2) {
-          guessWord(word, 'Tú');
-        }
-        return [];
-      });
+      const formedWord = selectedIndicesRef.current.map(i => wheelLettersRef.current[i]).join('');
+      setSelectedIndices([]);
+      if (formedWord.length >= 2) {
+        guessWord(formedWord, 'Tú');
+      }
     };
 
     window.addEventListener('pointermove', handlePointerMove);
@@ -1115,6 +1127,37 @@ export default function WordCross() {
         background: isOBSMode && isDirectObsUrl ? 'transparent' : 'radial-gradient(ellipse at 50% 35%, #183e25 0%, #0d2617 45%, #05130b 100%)'
       }}
     >
+      {/* ESTILOS NATIVOS 3D PARA ASEGURAR QUE LAS CASILLAS GIREN EN CUALQUIER NAVEGADOR Y OBS */}
+      <style>{`
+        .wc-card-flip {
+          perspective: 1000px;
+        }
+        .wc-flip-inner {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+          transform-style: preserve-3d;
+          -webkit-transform-style: preserve-3d;
+        }
+        .wc-face {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          border-radius: 0.5rem;
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .wc-face-back {
+          transform: rotateY(180deg);
+          -webkit-transform: rotateY(180deg);
+        }
+      `}</style>
+
       {/* BARRA DE CONFIGURACIÓN LATERAL */}
       {isSidebarOpen && !isOBSMode && (
         <aside className="w-80 md:w-88 flex-shrink-0 flex flex-col border-r border-emerald-950/80 bg-neutral-900/95 backdrop-blur z-40 overflow-hidden shadow-2xl transition-all">
@@ -1220,7 +1263,7 @@ export default function WordCross() {
               </div>
             </div>
 
-            {/* BOTONES DE PRUEBA RÁPIDA */}
+            {/* BOTONES DE PRUEBA MANUAL */}
             <div className="bg-neutral-950/80 p-3.5 rounded-2xl border border-neutral-800 space-y-2.5">
               <span className="font-bold text-neutral-200 block text-xs">Pruebas Manuales (Streamer):</span>
               <div className="grid grid-cols-2 gap-2">
@@ -1539,7 +1582,7 @@ export default function WordCross() {
                 return (
                   <div className="flex-1 flex items-center justify-center w-full">
                     <div
-                      className="grid preserve-3d"
+                      className="grid"
                       style={{
                         gridTemplateRows: `repeat(${totalRows}, ${cellSize}px)`,
                         gridTemplateColumns: `repeat(${totalCols}, ${cellSize}px)`,
@@ -1568,7 +1611,7 @@ export default function WordCross() {
                               id={`grid-cell-${key}`}
                               data-cell-key={key}
                               style={{ width: `${cellSize}px`, height: `${cellSize}px` }}
-                              className="relative preserve-3d"
+                              className="relative wc-card-flip"
                             >
                               {startingSolvedWords.length > 0 && (() => {
                                 const firstWord = startingSolvedWords[0];
@@ -1599,13 +1642,17 @@ export default function WordCross() {
                                 );
                               })()}
 
+                              {/* CONTENEDOR 3D FLIP NATIVO */}
                               <div
-                                className={`w-full h-full preserve-3d transition-transform duration-700 rounded-lg ${
-                                  isRevealed ? 'rotate-y-180' : ''
-                                }`}
+                                className="wc-flip-inner"
+                                style={{
+                                  transform: isRevealed ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                                  WebkitTransform: isRevealed ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                                }}
                               >
+                                {/* LADO FRONTAL: Madera oscura (Sin revelar) */}
                                 <div
-                                  className="absolute inset-0 backface-hidden rounded-lg flex items-center justify-center"
+                                  className="wc-face"
                                   style={{
                                     background: 'linear-gradient(145deg, #44210d 0%, #2c1407 100%)',
                                     boxShadow: 'inset 2.5px 2.5px 5px rgba(0,0,0,0.85), inset -1.5px -1.5px 3px rgba(255,255,255,0.08), 0 2px 4px rgba(0,0,0,0.4)',
@@ -1631,14 +1678,15 @@ export default function WordCross() {
                                   )}
                                 </div>
 
+                                {/* LADO POSTERIOR: Oro pulido con letra (Revelado) */}
                                 <div
-                                  className={`absolute inset-0 backface-hidden rotate-y-180 rounded-lg flex items-center justify-center font-black text-[#2a1305] shadow-[0_3px_8px_rgba(0,0,0,0.7),0_0_10px_rgba(255,224,102,0.6)] ${
-                                    cellSize <= 25 ? 'text-xs' : cellSize <= 28 ? 'text-sm' : 'text-lg'
-                                  }`}
+                                  className="wc-face wc-face-back font-black text-[#2a1305]"
                                   style={{
                                     background: 'linear-gradient(135deg, #fae28c 0%, #d89f38 50%, #996417 100%)',
                                     borderTop: '2px solid #ffffff',
-                                    borderBottom: '2.5px solid #6d4207'
+                                    borderBottom: '2.5px solid #6d4207',
+                                    boxShadow: '0 3px 8px rgba(0,0,0,0.7), 0 0 10px rgba(255,224,102,0.6)',
+                                    fontSize: cellSize <= 25 ? '12px' : cellSize <= 28 ? '14px' : '18px'
                                   }}
                                 >
                                   {cell.letter}
