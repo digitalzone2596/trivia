@@ -33,7 +33,8 @@ interface GameCard {
   status: 'ACTIVE' | 'SOON';
   badgeText: string;
   description: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon?: React.ComponentType<{ className?: string }>;
+  image?: string; // Logo personalizado
   tags: string[];
   route?: string;
   accentColor: 'cyan' | 'pink' | 'violet' | 'amber';
@@ -47,7 +48,7 @@ const GAMES: GameCard[] = [
     badgeText: 'DISPONIBLE AHORA',
     description:
       'Preguntas interactivas proyectadas en tu directo. Los espectadores responden con A, B, C o D directamente en el chat y acumulan puntos en tiempo real.',
-    icon: HelpCircle,
+    image: '/trivia-logo.png', // Si lo subiste como .jpg cámbialo a '/trivia-logo.jpg'
     tags: ['Lector de chat', 'Podio automático', 'Vertical & Horizontal'],
     route: '/trivia',
     accentColor: 'cyan',
@@ -101,7 +102,6 @@ export default function Home() {
 
   const inputId = useId();
 
-  // Sincronizar el usuario guardado en el perfil de Firebase
   useEffect(() => {
     if (userProfile?.tiktokUsername) {
       setUsername(userProfile.tiktokUsername);
@@ -117,7 +117,6 @@ export default function Home() {
     }, 3000);
   };
 
-  // Función para guardar y asociar el @ de TikTok a la cuenta en Firestore
   const handleSaveTikTokHandle = async () => {
     if (!user) {
       setShowAuthModal(true);
@@ -147,7 +146,6 @@ export default function Home() {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const targetUser = cleanUsername || userProfile?.tiktokUsername || '';
     
-    // Parámetros: Clave secreta (UID), usuario y modo OBS
     const params = new URLSearchParams();
     if (user?.uid) params.set('key', user.uid);
     if (targetUser) params.set('user', targetUser);
@@ -167,7 +165,6 @@ export default function Home() {
       return;
     }
 
-    // Auto-guardar el usuario si se modificó antes de entrar
     if (cleanUsername && cleanUsername !== userProfile?.tiktokUsername) {
       try {
         if (updateTikTokHandle) await updateTikTokHandle(cleanUsername);
@@ -261,7 +258,6 @@ export default function Home() {
       {/* Top Bar (Header) */}
       <header className="w-full border-b border-zinc-800/80 bg-zinc-950/70 backdrop-blur-xl sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          {/* Brand */}
           <div className="flex items-center gap-3">
             <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700/60 shadow-inner group">
               <Gamepad2 className="w-5 h-5 text-cyan-400 transition-transform group-hover:scale-110" />
@@ -275,7 +271,6 @@ export default function Home() {
             </span>
           </div>
 
-          {/* Navigation Links */}
           <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-zinc-400">
             <a href="#catalogo" className="hover:text-white transition-colors">
               Catálogo
@@ -288,7 +283,6 @@ export default function Home() {
             </a>
           </nav>
 
-          {/* Actions & Auth */}
           <div className="flex items-center gap-3">
             {isAdmin && (
               <button
@@ -397,7 +391,6 @@ export default function Home() {
               )}
             </div>
 
-            {/* Input + Botón de Guardar */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-3">
               <div className="relative flex-1 w-full flex items-center">
                 <label htmlFor={inputId} className="sr-only">
@@ -416,7 +409,6 @@ export default function Home() {
                 />
               </div>
 
-              {/* Botón para guardar/asociar a la cuenta */}
               <button
                 type="button"
                 disabled={isSavingTikTok}
@@ -432,7 +424,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Botones de acción rápida: Probar Trivia y Copiar OBS */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 border-t border-zinc-800/80">
               <button
                 type="button"
@@ -453,7 +444,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Estado del usuario */}
             <div className="mt-3 text-left">
               {userProfile?.tiktokUsername ? (
                 <p className="text-[11px] text-zinc-400 flex items-center gap-1.5 font-mono">
@@ -506,15 +496,24 @@ export default function Home() {
 
                   <div>
                     <div className="flex items-start justify-between gap-4 mb-5">
-                      <div
-                        className={`w-14 h-14 rounded-xl flex items-center justify-center border transition-transform duration-200 group-hover:scale-105 ${
-                          isActiveCard
-                            ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-lg shadow-cyan-500/10'
-                            : 'bg-zinc-800/50 border-zinc-700/40 text-zinc-400'
-                        }`}
-                      >
-                        <Icon className="w-7 h-7" />
-                      </div>
+                      {/* LOGO DE IMAGEN O ICONO */}
+                      {game.image ? (
+                        <img
+                          src={game.image}
+                          alt={game.title}
+                          className="w-14 h-14 rounded-2xl object-cover border border-cyan-500/40 shadow-lg shadow-cyan-500/20 transition-transform duration-200 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div
+                          className={`w-14 h-14 rounded-xl flex items-center justify-center border transition-transform duration-200 group-hover:scale-105 ${
+                            isActiveCard
+                              ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-lg shadow-cyan-500/10'
+                              : 'bg-zinc-800/50 border-zinc-700/40 text-zinc-400'
+                          }`}
+                        >
+                          {Icon && <Icon className="w-7 h-7" />}
+                        </div>
+                      )}
 
                       {isActiveCard ? (
                         <div className="flex items-center gap-2 text-xs font-semibold text-cyan-400">
@@ -804,7 +803,6 @@ export default function Home() {
                 <div>Estado: <span className="text-amber-400">Esperando aprobación del admin</span></div>
               </div>
 
-              {/* Botón de WhatsApp para activación */}
               <a
                 href={`https://wa.me/573504454869?text=${encodeURIComponent(
                   `Hola, me acabo de registrar en TikTok LIVE Games con el correo ${user?.email || ''} y solicito la activación de mi cuenta para iniciar mis directos.`
