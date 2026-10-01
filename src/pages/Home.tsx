@@ -278,10 +278,6 @@ export default function Home() {
             <a href="#instrucciones" className="hover:text-white transition-colors">
               Cómo funciona
             </a>
-            <a href="#obs-guia" className="hover:text-white transition-colors">
-              Guía OBS & Studio
-            </a>
-          </nav>
 
           <div className="flex items-center gap-3">
             {isAdmin && (
@@ -661,21 +657,6 @@ export default function Home() {
         </section>
 
         {/* INTERACTIVE OBS SIMULATOR BAR */}
-        <section id="obs-guia" className="w-full rounded-2xl bg-gradient-to-b from-zinc-900 to-zinc-950 border border-zinc-800 p-6 sm:p-8">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="max-w-xl">
-              <div className="inline-flex items-center gap-1.5 text-xs font-mono text-cyan-400 uppercase mb-2">
-                <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                <span>Compatible con OBS Studio, TikTok Live Studio & Streamlabs</span>
-              </div>
-              <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
-                Tu enlace de Browser Source listo para emitir
-              </h3>
-              <p className="text-sm text-zinc-400">
-                Pega este enlace exacto en la propiedad de URL de tu fuente de navegador. El fondo es transparente por defecto.
-              </p>
-            </div>
-
             <div className="flex-1 max-w-md w-full">
               <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-between gap-3 font-mono text-xs text-zinc-300">
                 <div className="truncate text-cyan-300 select-all">
