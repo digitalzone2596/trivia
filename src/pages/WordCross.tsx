@@ -237,6 +237,7 @@ export default function WordCross() {
   const revealedCellKeysRef = useRef<Set<string>>(new Set());
   const wheelLettersRef = useRef<string[]>([]);
   const selectedIndicesRef = useRef<number[]>([]);
+  const lastShuffleTimeRef = useRef<number>(0);
 
   useEffect(() => {
     solvedWordIdsRef.current = solvedWordIds;
@@ -264,8 +265,8 @@ export default function WordCross() {
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   const [connectedRoom, setConnectedRoom] = useState<string | null>(null);
 
-  // Música ambiental
-  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  // Música ambiental (Inicia activa por defecto)
+  const [isMusicPlaying, setIsMusicPlaying] = useState(true);
   const [musicVolume, setMusicVolume] = useState(35);
   const [selectedTrack, setSelectedTrack] = useState('bosque-magico');
 
@@ -444,6 +445,45 @@ export default function WordCross() {
   useEffect(() => {
     loadLevel(0);
   }, [loadLevel]);
+
+  /* ========================================================
+     AUTO-PLAY DE MÚSICA AMBIENTAL (OBS READY)
+     ======================================================== */
+  useEffect(() => {
+    const startAudio = () => {
+      try {
+        backgroundMusic.setTrack('bosque-magico');
+        backgroundMusic.setVolume(musicVolume / 100);
+        backgroundMusic.play();
+        setIsMusicPlaying(true);
+      } catch {
+        // Bloqueado temporalmente por navegador hasta la primera interacción
+      }
+    };
+
+    const timer = setTimeout(startAudio, 600);
+
+    // Desbloqueo automático para navegadores que restringen el primer autoplay
+    const unlockOnInteraction = () => {
+      initAudio();
+      try {
+        backgroundMusic.setVolume(musicVolume / 100);
+        backgroundMusic.play();
+        setIsMusicPlaying(true);
+      } catch {}
+      window.removeEventListener('pointerdown', unlockOnInteraction);
+      window.removeEventListener('keydown', unlockOnInteraction);
+    };
+
+    window.addEventListener('pointerdown', unlockOnInteraction);
+    window.addEventListener('keydown', unlockOnInteraction);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('pointerdown', unlockOnInteraction);
+      window.removeEventListener('keydown', unlockOnInteraction);
+    };
+  }, [initAudio, musicVolume]);
 
   /* ========================================================
      ESTRUCTURA DE CELDAS
@@ -657,9 +697,16 @@ export default function WordCross() {
   }, [playMagicSparkleChime, startParticleLoop]);
 
   /* ========================================================
-     SHUFFLE
+     SHUFFLE (CON ANTI-REPETICIÓN Y COOLDOWN DE 2.5s)
      ======================================================== */
   const triggerShuffle = useCallback((triggeredBy = 'Tú') => {
+    const now = Date.now();
+    // Evitar que se ejecute si ya se hizo un shuffle hace menos de 2.5 segundos
+    if (now - lastShuffleTimeRef.current < 2500) {
+      return;
+    }
+    lastShuffleTimeRef.current = now;
+
     playWoodTap(480);
     setIsSpinning(true);
     setTimeout(() => setIsSpinning(false), 500);
@@ -685,7 +732,7 @@ export default function WordCross() {
   }, [playWoodTap]);
 
   /* ========================================================
-     PISTA: 1 ROSA = 1 LETRA (SIN STALE CLOSURE)
+     PISTA: 1 ROSA = 1 LETRA (SIN REPETICIONES)
      ======================================================== */
   const triggerRoseSingleLetterHint = useCallback((user = 'Seguidor', avatar?: string) => {
     const unrevealedKeys: string[] = [];
@@ -709,7 +756,6 @@ export default function WordCross() {
     setRoseAnimation({ id: `${Date.now()}`, user, avatar: userAvatar });
     setTimeout(() => setRoseAnimation(null), 2200);
 
-    // Actualizar referencia y estado
     const nextRevealedKeys = new Set(revealedCellKeysRef.current);
     nextRevealedKeys.add(chosenKey);
     revealedCellKeysRef.current = nextRevealedKeys;
@@ -732,7 +778,6 @@ export default function WordCross() {
 
     setStars(prev => prev + 5);
 
-    // Comprobar si al revelar la letra se completó alguna palabra
     const nextSolved = new Set(solvedWordIdsRef.current);
     currentLevel.words.forEach(w => {
       if (!nextSolved.has(w.id)) {
@@ -773,7 +818,7 @@ export default function WordCross() {
   }, [gridCells, currentLevel, playRoseChime, playSuccessChord, playFanfare, triggerStarParticleBurst]);
 
   /* ========================================================
-     ADIVINAR PALABRA DESDE EL CHAT (SIN STALE CLOSURE)
+     ADIVINAR PALABRA DESDE EL CHAT
      ======================================================== */
   const guessWord = useCallback((rawWord: string, username = 'Jugador', avatar?: string) => {
     if (!rawWord || typeof rawWord !== 'string') return;
@@ -916,6 +961,7 @@ export default function WordCross() {
       }
     });
 
+    // LISTENER ÚNICO PARA CHAT (evita duplicar eventos)
     const handleIncomingChat = (data: { usuario?: string; user?: string; mensaje?: string; comment?: string; foto?: string; avatar?: string }) => {
       const user = (data.usuario || data.user || '').replace(/^@/, '');
       const comment = (data.mensaje || data.comment || '').trim();
@@ -936,11 +982,9 @@ export default function WordCross() {
     };
 
     socket.on('tiktokChat', handleIncomingChat);
-    socket.on('comentarioTikTokReal', handleIncomingChat);
 
-    // Variable anti-rebote para evitar procesar el mismo regalo en el mismo segundo
+    // LISTENER ÚNICO PARA REGALOS
     let lastGiftTimestamp = 0;
-
     const handleIncomingGift = (data: { usuario?: string; user?: string; foto?: string; avatar?: string; regalo?: string; giftName?: string; monedas?: number; cantidad?: number; repeatCount?: number }) => {
       const now = Date.now();
       if (now - lastGiftTimestamp < 400) return;
@@ -961,7 +1005,6 @@ export default function WordCross() {
       }
     };
 
-    // Escuchar únicamente tiktokRegalo (sin duplicar)
     socket.on('tiktokRegalo', handleIncomingGift);
 
     return () => {
@@ -1135,7 +1178,6 @@ export default function WordCross() {
         background: isOBSMode && isDirectObsUrl ? 'transparent' : 'radial-gradient(ellipse at 50% 35%, #183e25 0%, #0d2617 45%, #05130b 100%)'
       }}
     >
-      {/* ESTILOS NATIVOS 3D PARA ASEGURAR QUE LAS CASILLAS GIREN EN CUALQUIER NAVEGADOR Y OBS */}
       <style>{`
         .wc-card-flip {
           perspective: 1000px;
